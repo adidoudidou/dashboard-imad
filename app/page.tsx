@@ -35,7 +35,6 @@ export default function Page() {
   // ================= HOME =================
   const Home = () => (
     <div className="space-y-4">
-
       <h1 className="text-xl font-bold">📊 Dashboard</h1>
 
       <Card className="p-4">
@@ -63,32 +62,6 @@ export default function Page() {
           {data.progressionMois?.toFixed(1)} %
         </p>
       </Card>
-
-      <h2 className="text-lg font-semibold mt-2">⚠️ À payer</h2>
-
-      {data.aPayerList?.slice(0, 2).map((f: any, i: number) => (
-        <Card key={i} className="p-3 flex justify-between items-center">
-          <div>
-            <p className="font-semibold">{f.fournisseur}</p>
-            <p className="text-sm opacity-60">{f.montantHT}€</p>
-          </div>
-          <div className={f.retard ? "text-red-500" : "text-orange-400"}>
-            {f.retard ? "Urgent" : "À payer"}
-          </div>
-        </Card>
-      ))}
-
-      <h2 className="text-lg font-semibold">📈 CA</h2>
-
-      <Card className="p-4 h-52">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data.evolutionJournaliere}>
-            <Line dataKey="ca" stroke="#22c55e" strokeWidth={2} />
-            <Tooltip />
-          </LineChart>
-        </ResponsiveContainer>
-      </Card>
-
     </div>
   );
 
@@ -98,16 +71,14 @@ export default function Page() {
       <h1 className="text-xl font-bold">💸 Factures</h1>
 
       {data.aPayerList?.map((f: any, i: number) => (
-        <Card key={i} className="p-4">
-          <div className="flex justify-between">
-            <div>
-              <p className="font-semibold">{f.fournisseur}</p>
-              <p className="text-sm opacity-60">{f.echeance}</p>
-            </div>
+        <Card key={i} className="p-4 flex justify-between items-center">
+          <div>
+            <p className="font-semibold">{f.fournisseur}</p>
+            <p className="text-sm opacity-60">{f.montantHT} €</p>
+          </div>
 
-            <button className="px-3 py-1 bg-green-600 rounded">
-              OK
-            </button>
+          <div className={f.retard ? "text-red-500" : "text-orange-400"}>
+            {f.retard ? "Urgent" : "À payer"}
           </div>
         </Card>
       ))}
@@ -133,7 +104,7 @@ export default function Page() {
   );
 
   return (
-    <div className="bg-black text-white min-h-screen p-4 pb-20">
+    <div className="bg-black text-white min-h-screen p-4 pb-24">
 
       {/* CONTENT */}
       {tab === "home" && <Home />}
@@ -141,10 +112,38 @@ export default function Page() {
       {tab === "ajouter" && <Ajouter />}
 
       {/* BOTTOM NAV */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 flex justify-around p-3">
-        <button onClick={() => setTab("home")}>🏠</button>
-        <button onClick={() => setTab("factures")}>💸</button>
-        <button onClick={() => setTab("ajouter")}>➕</button>
+      <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 flex justify-around py-3 z-50">
+
+        <button
+          onClick={() => setTab("home")}
+          className={`flex flex-col items-center ${
+            tab === "home" ? "text-green-400" : "text-gray-500"
+          }`}
+        >
+          🏠
+          <span className="text-xs">Home</span>
+        </button>
+
+        <button
+          onClick={() => setTab("factures")}
+          className={`flex flex-col items-center ${
+            tab === "factures" ? "text-green-400" : "text-gray-500"
+          }`}
+        >
+          💸
+          <span className="text-xs">Factures</span>
+        </button>
+
+        <button
+          onClick={() => setTab("ajouter")}
+          className={`flex flex-col items-center ${
+            tab === "ajouter" ? "text-green-400" : "text-gray-500"
+          }`}
+        >
+          ➕
+          <span className="text-xs">Ajouter</span>
+        </button>
+
       </div>
 
     </div>
