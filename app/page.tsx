@@ -127,7 +127,7 @@ export default function Dashboard() {
   const totalRep = repartData.reduce((s, x) => s + x.value, 0)
   // Simplified benefice chart — one bar per month, colored
   const beneficeData = d.beneficeParMois.map(m => ({
-    label: m.label.replace(' 20', ' '20'),
+    label: m.label.replace(' 20', "'20"),
     benefice: Math.round(m.benefice),
     fill: m.benefice >= 0 ? '#22D3A5' : '#F43F5E',
   }))
