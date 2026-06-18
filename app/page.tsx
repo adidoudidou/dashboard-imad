@@ -103,7 +103,7 @@ export default function Dashboard() {
     setPayingId(id)
     try {
       await fetch('/api/pay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-      setPaidIds(prev => new Set([...prev, id]))
+      setPaidIds(prev => { const s = new Set(Array.from(prev)); s.add(id); return s })
       setTimeout(() => fetchAll(), 1500)
     } finally {
       setPayingId(null)
