@@ -33,7 +33,7 @@ type DashData = {
   progressionMois: number | null
   seuilRentabilite: number | null; tauxMargeVariable: number; coutMatierePC: number
   repartitionDepenses: Record<string, number>
-  aPayerList: { fournisseur: string; montantHT: number; categorie: string; echeance: string; statut: string; retard: boolean }[]
+  aPayerList: { id: string; fournisseur: string; montantHT: number; categorie: string; echeance: string; statut: string; retard: boolean }[]
   totalAPayer: number; currentMonth: string; lastMonth: string
 }
 
@@ -75,6 +75,8 @@ export default function Dashboard() {
   const [objectifInput, setObjectifInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [savedOk, setSavedOk] = useState(false)
+  const [payingId, setPayingId] = useState<string | null>(null)
+  const [paidIds, setPaidIds] = useState<Set<string>>(new Set())
   const [lastSync, setLastSync] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -96,6 +98,17 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => { fetchAll(); const t = setInterval(fetchAll, REFRESH); return () => clearInterval(t) }, [fetchAll])
+
+  async function markAsPaid(id: string) {
+    setPayingId(id)
+    try {
+      await fetch('/api/pay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      setPaidIds(prev => new Set([...prev, id]))
+      setTimeout(() => fetchAll(), 1500)
+    } finally {
+      setPayingId(null)
+    }
+  }
 
   async function saveObjectif() {
     const val = parseFloat(objectifInput.replace(/\s/g, '').replace(',', '.'))
@@ -459,21 +472,63 @@ export default function Dashboard() {
             <Card>
               <div style={{ textAlign: 'center', padding: '32px 0', color: '#4A4A6A', fontSize: 14 }}>✓ Aucune facture en attente</div>
             </Card>
-          ) : d.aPayerList.map((row, i) => (
-            <div key={i} style={{ background: '#12121A', border: `1px solid ${row.retard ? '#F43F5E44' : '#1E1E2E'}`, borderRadius: 16, padding: '16px', borderLeft: `3px solid ${row.retard ? '#F43F5E' : '#F59E0B'}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                <div style={{ flex: 1, marginRight: 12 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: '#E2E2F0', marginBottom: 3 }}>{row.fournisseur || '—'}</div>
-                  <div style={{ fontSize: 12, color: '#8888AA' }}>{row.categorie}</div>
+          ) : d.aPayerList.map((row, i) => {
+            const isPaid = paidIds.has(row.id)
+            const isPaying = payingId === row.id
+            return (
+              <div key={row.id || i} style={{
+                background: isPaid ? '#22D3A50A' : '#12121A',
+                border: `1px solid ${isPaid ? '#22D3A533' : row.retard ? '#F43F5E44' : '#1E1E2E'}`,
+                borderRadius: 16, padding: '16px',
+                borderLeft: `3px solid ${isPaid ? '#22D3A5' : row.retard ? '#F43F5E' : '#F59E0B'}`,
+                transition: 'all 0.3s ease',
+                opacity: isPaid ? 0.7 : 1,
+              }}>
+                {/* Top row: fournisseur + montant */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div style={{ flex: 1, marginRight: 12 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: isPaid ? '#22D3A5' : '#E2E2F0', marginBottom: 3 }}>
+                      {isPaid ? '✅ ' : ''}{row.fournisseur || '—'}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#8888AA' }}>{row.categorie} · #{row.id}</div>
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: isPaid ? '#22D3A5' : '#F59E0B', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}>
+                    {eur(row.montantHT)}
+                  </div>
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#F59E0B', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}>{eur(row.montantHT)}</div>
+
+                {/* Bottom row: date + badge + bouton OK */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: row.retard && !isPaid ? '#F43F5E' : '#8888AA', fontFamily: 'JetBrains Mono, monospace' }}>
+                    📅 {row.echeance}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {!isPaid && <Badge text={row.retard ? '🔴 En retard' : '🟠 À payer'} type={row.retard ? 'danger' : 'warning'} />}
+                    {isPaid
+                      ? <Badge text="✅ Payé" type="success" />
+                      : (
+                        <button
+                          onClick={() => markAsPaid(row.id)}
+                          disabled={isPaying || !row.id}
+                          style={{
+                            background: isPaying ? '#1E1E2E' : '#22D3A5',
+                            color: isPaying ? '#8888AA' : '#0A0A0F',
+                            border: 'none', borderRadius: 10,
+                            padding: '8px 14px', fontSize: 13, fontWeight: 700,
+                            cursor: isPaying ? 'wait' : 'pointer',
+                            transition: 'all 0.2s', whiteSpace: 'nowrap',
+                            display: 'flex', alignItems: 'center', gap: 5,
+                          }}
+                        >
+                          {isPaying ? '…' : '✓ OK Payé'}
+                        </button>
+                      )
+                    }
+                  </div>
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: row.retard ? '#F43F5E' : '#8888AA', fontFamily: 'JetBrains Mono, monospace' }}>📅 {row.echeance}</span>
-                <Badge text={row.retard ? '🔴 En retard' : '🟠 À payer'} type={row.retard ? 'danger' : 'warning'} />
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </>}
 
       </div>
