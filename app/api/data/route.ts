@@ -24,6 +24,18 @@ function monthLabel(key: string) {
   return new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleString('fr-FR', { month: 'long', year: 'numeric' })
 }
 
+// Returns Monday 00:00 and Sunday 23:59:59 of the week containing `d`
+function weekBounds(d: Date): { start: Date; end: Date } {
+  const day = d.getDay() // 0 = Sunday, 1 = Monday...
+  const diffToMonday = day === 0 ? -6 : 1 - day
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diffToMonday)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}
+
 const VENTE_CATEGORIES = ['Boissons', 'Boucherie', 'Charcuterie', 'Épicerie', 'Fruits & Légumes', 'Rôtisserie']
 const CAT_MAP: Record<string, string> = {
   'Boissons': 'Boisson',
@@ -49,7 +61,7 @@ export async function GET() {
     // ── Parse Ventes (only rows with Numéro Z) ───────────────────────────────
     const [, ...vData] = ventesRows
     type VenteRow = {
-      date: Date; dateStr: string; caHT: number
+      date: Date; dateStr: string; caHT: number; tvaMontant: number
       Boissons: number; Boucherie: number; Charcuterie: number
       Épicerie: number; 'Fruits & Légumes': number; Rôtisserie: number
     }
@@ -60,6 +72,7 @@ export async function GET() {
         date: parseDate(r[0])!,
         dateStr: r[0],
         caHT: parseNum(r[2]),
+        tvaMontant: parseNum(r[17]),
         Boissons: parseNum(r[8]),
         Boucherie: parseNum(r[9]),
         Charcuterie: parseNum(r[10]),
@@ -71,11 +84,12 @@ export async function GET() {
 
     // ── Parse Dépenses ────────────────────────────────────────────────────────
     // Columns: A=0 Date, B=1 Fournisseur, C=2 N°Facture, D=3 MontantHT,
+    // E=4 TVA Taux, F=5 TVA Montant, G=6 Montant TTC,
     // H=7 Catégorie, L=11 Échéance, M=12 Période, N=13 Montant_hebdo,
     // O=14 Date échéance finale, P=15 Statut_paiement, Q=16 ID
     const [, ...dData] = depensesRows
     type DepRow = {
-      date: Date | null; fournisseur: string; montantHT: number
+      date: Date | null; fournisseur: string; montantHT: number; montantTVA: number; montantTTC: number
       categorie: string; statut: string; echeance: Date | null
       periode: string; montantHebdo: number; dateEcheanceFin: Date | null
       id: string
@@ -85,6 +99,8 @@ export async function GET() {
       date: parseDate(r[0]),
       fournisseur: r[1] || '',
       montantHT: parseNum(r[3]),
+      montantTVA: parseNum(r[5]),
+      montantTTC: parseNum(r[6]),
       categorie: r[7] || '',
       statut: r[15] || '',
       echeance: parseDate(r[11]),
@@ -104,6 +120,25 @@ export async function GET() {
     const revenusMoisDernier = ventes.filter(r => monthKey(r.date) === lastMonth).reduce((s, r) => s + r.caHT, 0)
     const totalDepenses = depenses.reduce((s, r) => s + r.montantHT, 0)
     const depensesMoisCourant = depenses.filter(r => r.date && monthKey(r.date) === currentMonth).reduce((s, r) => s + r.montantHT, 0)
+    const depensesMoisCourantTTC = depenses.filter(r => r.date && monthKey(r.date) === currentMonth).reduce((s, r) => s + r.montantTTC, 0)
+
+    // ── Semaine en cours (lundi → dimanche) ─────────────────────────────────
+    const { start: weekStart, end: weekEnd } = weekBounds(today)
+    const revenusSemaine = ventes
+      .filter(r => r.date >= weekStart && r.date <= weekEnd)
+      .reduce((s, r) => s + r.caHT, 0)
+    const depensesSemaineTTC = depenses
+      .filter(r => r.date && r.date >= weekStart && r.date <= weekEnd)
+      .reduce((s, r) => s + r.montantTTC, 0)
+
+    // ── TVA à reverser (mois courant) ────────────────────────────────────────
+    const tvaCollecteeMois = ventes
+      .filter(r => monthKey(r.date) === currentMonth)
+      .reduce((s, r) => s + r.tvaMontant, 0)
+    const tvaDeductibleMois = depenses
+      .filter(r => r.date && monthKey(r.date) === currentMonth)
+      .reduce((s, r) => s + r.montantTVA, 0)
+    const tvaAReverser = tvaCollecteeMois - tvaDeductibleMois
 
     const chargesFixesTotales = depenses.filter(r => r.categorie === 'Charge fixe').reduce((s, r) => s + r.montantHT, 0)
     const chargesVariablesTotales = depenses.filter(r => r.categorie === 'Charge variable').reduce((s, r) => s + r.montantHT, 0)
@@ -173,22 +208,24 @@ export async function GET() {
       .map(r => ({
         id: r.id,
         fournisseur: r.fournisseur,
-        montantHT: r.montantHT,
+        montantTTC: r.montantTTC,
         categorie: r.categorie,
         echeance: r.dateEcheanceFin ? r.dateEcheanceFin.toLocaleDateString('fr-FR') : '—',
         statut: r.statut,
         retard: r.dateEcheanceFin ? r.dateEcheanceFin < today : false,
       }))
 
-    const totalAPayer = aPayerList.reduce((s, r) => s + r.montantHT, 0)
+    const totalAPayer = aPayerList.reduce((s, r) => s + r.montantTTC, 0)
 
     return NextResponse.json({
-      totalRevenus, totalDepenses, revenusMoisCourant, revenusMoisDernier, depensesMoisCourant,
+      totalRevenus, totalDepenses, revenusMoisCourant, revenusMoisDernier, depensesMoisCourant, depensesMoisCourantTTC,
+      revenusSemaine, depensesSemaineTTC,
       chargesFixesTotales, chargesVariablesTotales,
       beneficeParMois, venteParCat, depParCat, margeParCat,
       evolutionJournaliere, progressionMois,
       seuilRentabilite, tauxMargeVariable, coutMatierePC,
       repartitionDepenses, aPayerList, totalAPayer,
+      tvaCollecteeMois, tvaDeductibleMois, tvaAReverser,
       currentMonth: monthLabel(currentMonth),
       lastMonth: monthLabel(lastMonth),
     })
