@@ -27,7 +27,7 @@ type DashData = {
   revenusMoisCourant: number; revenusMoisDernier: number; depensesMoisCourant: number; depensesMoisCourantTTC: number
   revenusSemaine: number; depensesSemaine: number; depensesSemaineTTC: number
   tvaCollecteeMois: number; tvaDeductibleMois: number; tvaAReverser: number
-  chargesFixesTotales: number; chargesVariablesTotales: number
+  chargesFixesTotales: number; chargesVariablesTotales: number; chargesFixesMoisCourant: number
   beneficeParMois: { mois: string; label: string; revenus: number; depenses: number; benefice: number }[]
   venteParCat: Record<string, number>
   venteParCatMoisCourant: Record<string, number>
@@ -385,14 +385,32 @@ export default function Dashboard() {
         {/* ══════════ DÉPENSES ══════════ */}
         {tab === 'depenses' && <>
           <div className="grid2">
-            <KpiCard label="Total dépenses" value={eur(d.totalDepenses)} color="#F43F5E" icon="📉" />
-            <KpiCard label="Ce mois (TTC)" value={eur(d.depensesMoisCourantTTC)} color="#F43F5E" icon="📅" />
+            <Card>
+              <SectionTitle>📉 Dépenses (HT)</SectionTitle>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 4 }}>Cette semaine</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.depensesSemaine)}</div>
+              </div>
+              <div style={{ borderTop: '1px solid #1E1E2E', paddingTop: 14 }}>
+                <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 4 }}>{d.currentMonth}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.depensesMoisCourant)}</div>
+              </div>
+            </Card>
+            <Card>
+              <SectionTitle>🧾 TVA déductible</SectionTitle>
+              <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 14 }}>{d.currentMonth}</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#6C63FF', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.tvaDeductibleMois)}</div>
+              <div style={{ borderTop: '1px solid #1E1E2E', marginTop: 14, paddingTop: 14 }}>
+                <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 4 }}>Total réel à sortir (HT + TVA)</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#F59E0B', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.depensesMoisCourantTTC)}</div>
+              </div>
+            </Card>
           </div>
 
           {/* Répartition */}
           <Card>
-            <SectionTitle>🥧 Répartition des dépenses</SectionTitle>
-            <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 16 }}>Toutes catégories confondues</div>
+            <SectionTitle>🥧 Répartition des dépenses — {d.currentMonth}</SectionTitle>
+            <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 16 }}>Toutes catégories confondues, mois en cours</div>
             {repartData.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height={220}>
@@ -414,13 +432,13 @@ export default function Dashboard() {
                   ))}
                 </div>
               </>
-            ) : <div style={{ color: '#4A4A6A', fontSize: 13 }}>Aucune donnée</div>}
+            ) : <div style={{ color: '#4A4A6A', fontSize: 13 }}>Aucune donnée ce mois</div>}
           </Card>
 
           {/* Coût matière */}
           <Card>
-            <SectionTitle>🧮 Coût matière %</SectionTitle>
-            <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 16 }}>Part des achats fournisseurs dans le CA</div>
+            <SectionTitle>🧮 Coût matière % — {d.currentMonth}</SectionTitle>
+            <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 16 }}>Part des achats fournisseurs dans le CA du mois</div>
             <div style={{ fontSize: 52, fontWeight: 800, color: d.coutMatierePC > 40 ? '#F43F5E' : d.coutMatierePC > 30 ? '#F59E0B' : '#22D3A5', fontFamily: 'JetBrains Mono, monospace', marginBottom: 8 }}>
               {d.coutMatierePC.toFixed(1)}%
             </div>
@@ -439,17 +457,17 @@ export default function Dashboard() {
 
           {/* Seuil rentabilité */}
           <Card>
-            <SectionTitle>⚖️ Seuil de rentabilité</SectionTitle>
-            <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 16 }}>CA minimum pour couvrir toutes les charges</div>
+            <SectionTitle>⚖️ Seuil de rentabilité — {d.currentMonth}</SectionTitle>
+            <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 16 }}>CA minimum du mois pour couvrir toutes les charges</div>
             {d.seuilRentabilite !== null ? (
               <>
                 <div style={{ fontSize: 36, fontWeight: 800, color: '#F59E0B', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>{eur(d.seuilRentabilite)}</div>
                 <div style={{ fontSize: 13, color: '#8888AA', marginBottom: 20 }}>à réaliser pour être à l'équilibre</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {[
-                    { label: 'Charges fixes', val: eur(d.chargesFixesTotales) },
+                    { label: 'Charges fixes du mois', val: eur(d.chargesFixesMoisCourant) },
                     { label: 'Taux marge / coût variable', val: `${d.tauxMargeVariable.toFixed(1)}%` },
-                    { label: 'CA actuel', val: eur(d.totalRevenus), color: d.totalRevenus >= d.seuilRentabilite ? '#22D3A5' : '#F43F5E' },
+                    { label: 'CA du mois', val: eur(d.revenusMoisCourant), color: d.revenusMoisCourant >= d.seuilRentabilite ? '#22D3A5' : '#F43F5E' },
                   ].map(r => (
                     <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#0A0A0F', borderRadius: 10 }}>
                       <span style={{ fontSize: 12, color: '#8888AA' }}>{r.label}</span>
