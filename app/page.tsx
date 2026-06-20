@@ -34,7 +34,7 @@ type DashData = {
   margeParCat: Record<string, { ventes: number; depenses: number; marge: number; tauxMarge: number }>
   evolutionJournaliere: { date: string; ca: number }[]
   progressionMois: number | null
-  seuilRentabilite: number | null; tauxMargeVariable: number; coutMatierePC: number
+  seuilRentabilite: number | null; tauxMargeVariable: number; coutMatierePC: number; margeNegative: boolean; margeBruteMois: number
   repartitionDepenses: Record<string, number>
   aPayerList: { id: string; fournisseur: string; montantTTC: number; categorie: string; echeance: string; statut: string; retard: boolean }[]
   totalAPayer: number; currentMonth: string; lastMonth: string
@@ -476,7 +476,18 @@ export default function Dashboard() {
                   ))}
                 </div>
               </>
-            ) : <div style={{ color: '#4A4A6A', fontSize: 13 }}>Données insuffisantes pour le calcul</div>}
+            ) : d.margeNegative ? (
+              <div style={{ background: '#F43F5E0A', border: '1px solid #F43F5E33', borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#F43F5E', marginBottom: 8 }}>⚠️ Marge brute négative ce mois</div>
+                <div style={{ fontSize: 12, color: '#8888AA', lineHeight: 1.6, marginBottom: 12 }}>
+                  Le coût des achats fournisseurs ({eur(d.coutMatierePC > 0 ? (d.revenusMoisCourant * d.coutMatierePC / 100) : 0)}) dépasse déjà le CA du mois ({eur(d.revenusMoisCourant)}), avant même de compter les charges fixes. Aucun seuil de rentabilité n'est atteignable tant que cette situation persiste — chaque vente coûte plus cher qu'elle ne rapporte.
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#0A0A0F', borderRadius: 10 }}>
+                  <span style={{ fontSize: 12, color: '#8888AA' }}>Marge brute du mois</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.margeBruteMois)}</span>
+                </div>
+              </div>
+            ) : <div style={{ color: '#4A4A6A', fontSize: 13 }}>Pas encore de données ce mois</div>}
           </Card>
         </>}
 
