@@ -127,6 +127,9 @@ export async function GET() {
     const revenusSemaine = ventes
       .filter(r => r.date >= weekStart && r.date <= weekEnd)
       .reduce((s, r) => s + r.caHT, 0)
+    const depensesSemaine = depenses
+      .filter(r => r.date && r.date >= weekStart && r.date <= weekEnd)
+      .reduce((s, r) => s + r.montantHT, 0)
     const depensesSemaineTTC = depenses
       .filter(r => r.date && r.date >= weekStart && r.date <= weekEnd)
       .reduce((s, r) => s + r.montantTTC, 0)
@@ -146,6 +149,13 @@ export async function GET() {
     const venteParCat: Record<string, number> = {}
     VENTE_CATEGORIES.forEach(cat => {
       venteParCat[cat] = ventes.reduce((s, r) => s + ((r as any)[cat] || 0), 0)
+    })
+
+    const venteParCatMoisCourant: Record<string, number> = {}
+    VENTE_CATEGORIES.forEach(cat => {
+      venteParCatMoisCourant[cat] = ventes
+        .filter(r => monthKey(r.date) === currentMonth)
+        .reduce((s, r) => s + ((r as any)[cat] || 0), 0)
     })
 
     const depParCat: Record<string, number> = {}
@@ -219,9 +229,9 @@ export async function GET() {
 
     return NextResponse.json({
       totalRevenus, totalDepenses, revenusMoisCourant, revenusMoisDernier, depensesMoisCourant, depensesMoisCourantTTC,
-      revenusSemaine, depensesSemaineTTC,
+      revenusSemaine, depensesSemaine, depensesSemaineTTC,
       chargesFixesTotales, chargesVariablesTotales,
-      beneficeParMois, venteParCat, depParCat, margeParCat,
+      beneficeParMois, venteParCat, venteParCatMoisCourant, depParCat, margeParCat,
       evolutionJournaliere, progressionMois,
       seuilRentabilite, tauxMargeVariable, coutMatierePC,
       repartitionDepenses, aPayerList, totalAPayer,
