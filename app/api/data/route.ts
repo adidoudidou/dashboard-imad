@@ -213,7 +213,11 @@ export async function GET() {
       .reduce((s, r) => s + r.montantHT, 0)
     const margeBruteMois = revenusMoisCourant - achatsFournisseursMois
     const tauxMargeVariable = revenusMoisCourant > 0 ? (margeBruteMois / revenusMoisCourant) * 100 : 0
+    // seuilRentabilite reste calculable tant que le taux de marge est strictement positif.
+    // S'il est négatif ou nul, le seuil de rentabilité est mathématiquement infini (ou non pertinent) :
+    // chaque euro de vente supplémentaire coûte plus cher qu'il ne rapporte avant même les charges fixes.
     const seuilRentabilite = tauxMargeVariable > 0 ? (chargesFixesMoisCourant / (tauxMargeVariable / 100)) : null
+    const margeNegative = revenusMoisCourant > 0 && tauxMargeVariable <= 0
 
     const repartitionDepenses: Record<string, number> = {}
     depenses
@@ -250,7 +254,7 @@ export async function GET() {
       chargesFixesTotales, chargesVariablesTotales, chargesFixesMoisCourant,
       beneficeParMois, venteParCat, venteParCatMoisCourant, depParCat, depParCatMoisCourant, margeParCat,
       evolutionJournaliere, progressionMois,
-      seuilRentabilite, tauxMargeVariable, coutMatierePC,
+      seuilRentabilite, tauxMargeVariable, coutMatierePC, margeNegative, margeBruteMois,
       repartitionDepenses, aPayerList, totalAPayer,
       tvaCollecteeMois, tvaDeductibleMois, tvaAReverser,
       currentMonth: monthLabel(currentMonth),
