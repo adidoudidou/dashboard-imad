@@ -9,7 +9,7 @@ import {
 const REFRESH = 10_000
 
 function eur(n: number) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
 }
 function pct(n: number) { return `${n >= 0 ? '+' : ''}${n.toFixed(1)}%` }
 
@@ -25,11 +25,12 @@ const TT = {
 type DashData = {
   totalRevenus: number; totalDepenses: number
   revenusMoisCourant: number; revenusMoisDernier: number; depensesMoisCourant: number; depensesMoisCourantTTC: number
-  revenusSemaine: number; depensesSemaineTTC: number
+  revenusSemaine: number; depensesSemaine: number; depensesSemaineTTC: number
   tvaCollecteeMois: number; tvaDeductibleMois: number; tvaAReverser: number
   chargesFixesTotales: number; chargesVariablesTotales: number
   beneficeParMois: { mois: string; label: string; revenus: number; depenses: number; benefice: number }[]
   venteParCat: Record<string, number>
+  venteParCatMoisCourant: Record<string, number>
   margeParCat: Record<string, { ventes: number; depenses: number; marge: number; tauxMarge: number }>
   evolutionJournaliere: { date: string; ca: number }[]
   progressionMois: number | null
@@ -136,7 +137,7 @@ export default function Dashboard() {
   const progressObj = objectif > 0 ? Math.min(100, (d.revenusMoisCourant / objectif) * 100) : 0
   const resteObj = Math.max(0, objectif - d.revenusMoisCourant)
   const objAtteint = objectif > 0 && d.revenusMoisCourant >= objectif
-  const ventesCatData = Object.entries(d.venteParCat).map(([name, value]) => ({ name, value })).filter(x => x.value > 0)
+  const ventesCatData = Object.entries(d.venteParCatMoisCourant).map(([name, value]) => ({ name, value })).filter(x => x.value > 0)
   const margeCatData = Object.entries(d.margeParCat).map(([name, v]) => ({ name, marge: Math.round(v.marge), taux: Math.round(v.tauxMarge) })).filter(x => Math.abs(x.marge) > 0)
   const repartData = Object.entries(d.repartitionDepenses).map(([name, value]) => ({ name, value })).filter(x => x.value > 0).sort((a, b) => b.value - a.value)
   const totalRep = repartData.reduce((s, x) => s + x.value, 0)
@@ -188,9 +189,9 @@ export default function Dashboard() {
         {tab === 'overview' && <>
           {/* KPIs 2x2 */}
           <div className="grid2">
-            <KpiCard label="Revenus" value={eur(d.revenusMoisCourant)} sub={`${eur(d.revenusSemaine)} cette semaine`} color="#22D3A5" icon="💰" />
-            <KpiCard label="Dépenses" value={eur(d.depensesMoisCourantTTC)} sub={`${eur(d.depensesSemaineTTC)} cette semaine (TTC)`} color="#F43F5E" icon="📉" />
-            <KpiCard label="Bénéfice" value={eur(beneficeMois)} sub={`${eur(d.revenusSemaine - d.depensesSemaineTTC)} cette semaine`} color={beneficeMois >= 0 ? '#22D3A5' : '#F43F5E'} icon="✨" />
+            <KpiCard label="Revenus (HT)" value={eur(d.revenusMoisCourant)} sub={`${eur(d.revenusSemaine)} cette semaine`} color="#22D3A5" icon="💰" />
+            <KpiCard label="Dépenses (HT)" value={eur(d.depensesMoisCourant)} sub={`TTC réel : ${eur(d.depensesMoisCourantTTC)}`} color="#F43F5E" icon="📉" />
+            <KpiCard label="Bénéfice (HT)" value={eur(beneficeMois)} sub={`${eur(d.revenusSemaine - d.depensesSemaine)} cette semaine`} color={beneficeMois >= 0 ? '#22D3A5' : '#F43F5E'} icon="✨" />
             <KpiCard label="À payer" value={eur(d.totalAPayer)} sub={`${d.aPayerList.filter(x => x.retard).length} en retard`} color="#F59E0B" icon="📦" />
           </div>
 
@@ -288,8 +289,23 @@ export default function Dashboard() {
         {/* ══════════ REVENUS ══════════ */}
         {tab === 'revenus' && <>
           <div className="grid2">
-            <KpiCard label="Total revenus" value={eur(d.totalRevenus)} color="#22D3A5" icon="💰" />
-            <KpiCard label="Ce mois" value={eur(d.revenusMoisCourant)} color="#22D3A5" icon="📅" />
+            <Card>
+              <SectionTitle>💰 Revenus (HT)</SectionTitle>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 4 }}>Cette semaine</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.revenusSemaine)}</div>
+              </div>
+              <div style={{ borderTop: '1px solid #1E1E2E', paddingTop: 14 }}>
+                <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 4 }}>{d.currentMonth}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.revenusMoisCourant)}</div>
+              </div>
+            </Card>
+            <Card>
+              <SectionTitle>🧾 TVA collectée</SectionTitle>
+              <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 14 }}>{d.currentMonth}</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#6C63FF', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.tvaCollecteeMois)}</div>
+              <div style={{ fontSize: 12, color: '#8888AA', marginTop: 10, lineHeight: 1.4 }}>collectée sur les ventes, à reverser (déduction faite de la TVA sur achats)</div>
+            </Card>
           </div>
 
           {/* Bénéfice par mois — une seule barre colorée */}
@@ -336,7 +352,7 @@ export default function Dashboard() {
 
           {/* Ventes par catégorie */}
           <Card>
-            <SectionTitle>🛒 Ventes totales par catégorie</SectionTitle>
+            <SectionTitle>🛒 Ventes par catégorie — {d.currentMonth}</SectionTitle>
             {ventesCatData.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height={220}>
