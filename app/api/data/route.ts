@@ -163,6 +163,14 @@ export async function GET() {
       depParCat[cat] = depenses.filter(r => r.categorie === cat).reduce((s, r) => s + r.montantHT, 0)
     })
 
+    // Achats fournisseurs du mois en cours, par catégorie (pour coût matière + seuil rentabilité)
+    const depParCatMoisCourant: Record<string, number> = {}
+    ;['Boisson','Boucherie','Charcuterie','Epicerie','Fruit et légume','Rotisserie'].forEach(cat => {
+      depParCatMoisCourant[cat] = depenses
+        .filter(r => r.categorie === cat && r.date && monthKey(r.date) === currentMonth)
+        .reduce((s, r) => s + r.montantHT, 0)
+    })
+
     const margeParCat: Record<string, { ventes: number; depenses: number; marge: number; tauxMarge: number }> = {}
     VENTE_CATEGORIES.forEach(catV => {
       const catD = CAT_MAP[catV]
@@ -191,21 +199,30 @@ export async function GET() {
       ? ((revenusMoisCourant - revenusMoisDernier) / revenusMoisDernier) * 100
       : null
 
-    const totalVentes = totalRevenus
-    const tauxMargeVariable = totalVentes > 0
-      ? ((totalVentes - chargesVariablesTotales - Object.values(depParCat).reduce((s, v) => s + v, 0)) / totalVentes) * 100
-      : 0
-    const seuilRentabilite = tauxMargeVariable > 0 ? (chargesFixesTotales / (tauxMargeVariable / 100)) : null
+    // ── Coût matière % (mois en cours) ──────────────────────────────────────
+    // = achats fournisseurs du mois / CA du mois
+    const achatsFournisseursMois = Object.values(depParCatMoisCourant).reduce((s, v) => s + v, 0)
+    const coutMatierePC = revenusMoisCourant > 0 ? (achatsFournisseursMois / revenusMoisCourant) * 100 : 0
 
-    const totalVentesCat = Object.values(venteParCat).reduce((s, v) => s + v, 0)
-    const totalDepCat = Object.values(depParCat).reduce((s, v) => s + v, 0)
-    const coutMatierePC = totalVentesCat > 0 ? (totalDepCat / totalVentesCat) * 100 : 0
+    // ── Seuil de rentabilité (mois en cours) ────────────────────────────────
+    // Marge brute = CA - achats fournisseurs (les coûts variables liés au volume de vente)
+    // Taux de marge sur CV = Marge brute / CA
+    // Seuil = Charges fixes du mois / Taux de marge sur CV
+    const chargesFixesMoisCourant = depenses
+      .filter(r => r.categorie === 'Charge fixe' && r.date && monthKey(r.date) === currentMonth)
+      .reduce((s, r) => s + r.montantHT, 0)
+    const margeBruteMois = revenusMoisCourant - achatsFournisseursMois
+    const tauxMargeVariable = revenusMoisCourant > 0 ? (margeBruteMois / revenusMoisCourant) * 100 : 0
+    const seuilRentabilite = tauxMargeVariable > 0 ? (chargesFixesMoisCourant / (tauxMargeVariable / 100)) : null
 
     const repartitionDepenses: Record<string, number> = {}
-    depenses.forEach(r => {
-      if (!r.categorie) return
-      repartitionDepenses[r.categorie] = (repartitionDepenses[r.categorie] || 0) + r.montantHT
-    })
+    depenses
+      .filter(r => r.date && monthKey(r.date) === currentMonth)
+      .forEach(r => {
+        if (!r.categorie) return
+        repartitionDepenses[r.categorie] = (repartitionDepenses[r.categorie] || 0) + r.montantHT
+      })
+
 
     // À payer = not paid (exclude ✅ Payé)
     const aPayerList = depenses
@@ -230,8 +247,8 @@ export async function GET() {
     return NextResponse.json({
       totalRevenus, totalDepenses, revenusMoisCourant, revenusMoisDernier, depensesMoisCourant, depensesMoisCourantTTC,
       revenusSemaine, depensesSemaine, depensesSemaineTTC,
-      chargesFixesTotales, chargesVariablesTotales,
-      beneficeParMois, venteParCat, venteParCatMoisCourant, depParCat, margeParCat,
+      chargesFixesTotales, chargesVariablesTotales, chargesFixesMoisCourant,
+      beneficeParMois, venteParCat, venteParCatMoisCourant, depParCat, depParCatMoisCourant, margeParCat,
       evolutionJournaliere, progressionMois,
       seuilRentabilite, tauxMargeVariable, coutMatierePC,
       repartitionDepenses, aPayerList, totalAPayer,
