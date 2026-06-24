@@ -134,6 +134,15 @@ export async function GET() {
       .filter(r => r.date && r.date >= weekStart && r.date <= weekEnd)
       .reduce((s, r) => s + r.montantTTC, 0)
 
+    // Achats marchandises semaine (dépenses réelles dont date échéance dans la semaine)
+    const MARCHANDISES = ['Boisson','Boucherie','Charcuterie','Epicerie','Fruit et légume','Rotisserie']
+    const achatsMarchandisesHebdo = depenses
+      .filter(r => MARCHANDISES.includes(r.categorie.trim()) && r.dateEcheanceFin && r.dateEcheanceFin >= weekStart && r.dateEcheanceFin <= weekEnd)
+      .reduce((s, r) => s + r.montantHT, 0)
+    const achatsMarchandisesMois = depenses
+      .filter(r => MARCHANDISES.includes(r.categorie.trim()) && r.dateEcheanceFin && monthKey(r.dateEcheanceFin) === currentMonth)
+      .reduce((s, r) => s + r.montantHT, 0)
+
     // ── TVA à reverser (mois courant) ────────────────────────────────────────
     const tvaCollecteeMois = ventes
       .filter(r => monthKey(r.date) === currentMonth)
@@ -262,6 +271,7 @@ export async function GET() {
     return NextResponse.json({
       totalRevenus, totalDepenses, revenusMoisCourant, revenusMoisDernier, depensesMoisCourant, depensesMoisCourantTTC,
       revenusSemaine, depensesSemaine, depensesSemaineTTC,
+      achatsMarchandisesHebdo, achatsMarchandisesMois,
       chargesFixesTotales, chargesVariablesTotales, chargesFixesMoisCourant,
       chargesFixesHebdo, chargesVariablesHebdo, chargesHebdo, chargesMois,
       beneficeParMois, venteParCat, venteParCatMoisCourant, depParCat, depParCatMoisCourant, margeParCat,
