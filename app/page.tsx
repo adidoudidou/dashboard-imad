@@ -28,6 +28,7 @@ type DashData = {
   revenusSemaine: number; depensesSemaine: number; depensesSemaineTTC: number
   tvaCollecteeMois: number; tvaDeductibleMois: number; tvaAReverser: number
   chargesFixesTotales: number; chargesVariablesTotales: number; chargesFixesMoisCourant: number
+  chargesFixesHebdo: number; chargesVariablesHebdo: number; chargesHebdo: number; chargesMois: number
   beneficeParMois: { mois: string; label: string; revenus: number; depenses: number; benefice: number }[]
   venteParCat: Record<string, number>
   venteParCatMoisCourant: Record<string, number>
@@ -134,6 +135,21 @@ export default function Dashboard() {
   const d = data!
   const benefice = d.totalRevenus - d.totalDepenses
   const beneficeMois = d.revenusMoisCourant - d.depensesMoisCourant
+
+  // Objectif net : ce qu'Imad veut dans la poche
+  // Marge à générer = objectif net + charges fixes/variables (qui s'appliquent au-dessus)
+  const objectifNetMois = objectif  // saisi par Imad = ce qu'il veut dans la poche
+  const objectifNetHebdo = objectif > 0 ? objectif / 4.33 : 0
+  const margeAGenererMois = objectifNetMois + d.chargesMois   // ce qu'il faut vendre moins les achats
+  const margeAGenererHebdo = objectifNetHebdo + d.chargesHebdo
+  // Marge brute réalisée = CA - achats marchandises (hors charges fixes/var)
+  const margeBruteRealisee = d.revenusMoisCourant - d.depensesMoisCourant - (d.chargesFixesMoisCourant)
+  const margeBruteRealiseeHebdo = d.revenusSemaine - d.depensesSemaine - (d.chargesHebdo)
+  const resteNetMois = Math.max(0, margeAGenererMois - d.revenusMoisCourant)
+  const resteNetHebdo = Math.max(0, margeAGenererHebdo - d.revenusSemaine)
+  const progressMois = margeAGenererMois > 0 ? Math.min(100, (d.revenusMoisCourant / margeAGenererMois) * 100) : 0
+  const progressHebdo = margeAGenererHebdo > 0 ? Math.min(100, (d.revenusSemaine / margeAGenererHebdo) * 100) : 0
+
   const progressObj = objectif > 0 ? Math.min(100, (d.revenusMoisCourant / objectif) * 100) : 0
   const resteObj = Math.max(0, objectif - d.revenusMoisCourant)
   const objAtteint = objectif > 0 && d.revenusMoisCourant >= objectif
@@ -195,18 +211,21 @@ export default function Dashboard() {
             <KpiCard label="À payer" value={eur(d.totalAPayer)} sub={`${d.aPayerList.filter(x => x.retard).length} en retard`} color="#F59E0B" icon="📦" />
           </div>
 
-          {/* Objectif */}
+          {/* Objectif net */}
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <SectionTitle>🎯 Objectif mensuel — {d.currentMonth}</SectionTitle>
-              {objAtteint && <Badge text="✓ Atteint !" type="success" />}
+              <SectionTitle>🎯 Objectif net "dans la poche"</SectionTitle>
+              {objectif > 0 && d.revenusMoisCourant >= margeAGenererMois && <Badge text="✓ Atteint !" type="success" />}
             </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+
+            {/* Saisie */}
+            <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 8 }}>Ce que tu veux gagner ce mois (net, après charges)</div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
               <div style={{ position: 'relative', flex: 1 }}>
                 <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#8888AA', fontSize: 15, pointerEvents: 'none' }}>€</span>
                 <input
                   value={objectifInput} onChange={e => setObjectifInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && saveObjectif()} placeholder="Ex: 15000"
+                  onKeyDown={e => e.key === 'Enter' && saveObjectif()} placeholder="Ex: 4000"
                   style={{ width: '100%', background: '#0A0A0F', border: '1px solid #1E1E2E', borderRadius: 12, padding: '13px 12px 13px 30px', color: '#E2E2F0', fontSize: 15, fontFamily: 'JetBrains Mono, monospace', transition: 'border-color 0.2s' }}
                   onFocus={e => e.target.style.borderColor = '#6C63FF'}
                   onBlur={e => e.target.style.borderColor = '#1E1E2E'}
@@ -216,25 +235,66 @@ export default function Dashboard() {
                 {saving ? '…' : savedOk ? '✓' : 'Définir'}
               </button>
             </div>
-            <div className="grid2" style={{ marginBottom: objectif > 0 ? 16 : 0 }}>
-              <div style={{ background: '#0A0A0F', borderRadius: 12, padding: '12px 14px' }}>
-                <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 6 }}>Réalisé</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.revenusMoisCourant)}</div>
+
+            {objectif > 0 ? (
+              <>
+                {/* Tableau semaine + mois */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                  {/* Semaine */}
+                  <div style={{ background: '#0A0A0F', borderRadius: 12, padding: '14px' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#6C63FF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Cette semaine</div>
+                    {[
+                      { label: 'Objectif net', val: eur(objectifNetHebdo), color: '#E2E2F0' },
+                      { label: 'Charges fixes/var.', val: eur(d.chargesHebdo), color: '#8888AA' },
+                      { label: 'Marge à générer', val: eur(margeAGenererHebdo), color: '#6C63FF', bold: true },
+                      { label: 'Réalisé', val: eur(d.revenusSemaine), color: '#22D3A5' },
+                      { label: 'Reste à faire', val: resteNetHebdo > 0 ? eur(resteNetHebdo) : '✓ OK', color: resteNetHebdo > 0 ? '#F59E0B' : '#22D3A5', bold: true },
+                    ].map(r => (
+                      <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, color: '#8888AA' }}>{r.label}</span>
+                        <span style={{ fontSize: 12, fontWeight: r.bold ? 700 : 500, color: r.color, fontFamily: 'JetBrains Mono, monospace' }}>{r.val}</span>
+                      </div>
+                    ))}
+                    {/* Progress semaine */}
+                    <div style={{ height: 6, background: '#1E1E2E', borderRadius: 99, overflow: 'hidden', marginTop: 10 }}>
+                      <div style={{ height: '100%', width: `${progressHebdo}%`, borderRadius: 99, background: 'linear-gradient(90deg,#6C63FF,#9C8FFF)', transition: 'width 0.8s' }} />
+                    </div>
+                    <div style={{ fontSize: 10, color: '#6C63FF', fontWeight: 600, marginTop: 4 }}>{progressHebdo.toFixed(0)}%</div>
+                  </div>
+
+                  {/* Mois */}
+                  <div style={{ background: '#0A0A0F', borderRadius: 12, padding: '14px' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#22D3A5', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>{d.currentMonth}</div>
+                    {[
+                      { label: 'Objectif net', val: eur(objectifNetMois), color: '#E2E2F0' },
+                      { label: 'Charges fixes/var.', val: eur(d.chargesMois), color: '#8888AA' },
+                      { label: 'Marge à générer', val: eur(margeAGenererMois), color: '#22D3A5', bold: true },
+                      { label: 'Réalisé', val: eur(d.revenusMoisCourant), color: '#22D3A5' },
+                      { label: 'Reste à faire', val: resteNetMois > 0 ? eur(resteNetMois) : '✓ Atteint', color: resteNetMois > 0 ? '#F59E0B' : '#22D3A5', bold: true },
+                    ].map(r => (
+                      <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, color: '#8888AA' }}>{r.label}</span>
+                        <span style={{ fontSize: 12, fontWeight: r.bold ? 700 : 500, color: r.color, fontFamily: 'JetBrains Mono, monospace' }}>{r.val}</span>
+                      </div>
+                    ))}
+                    {/* Progress mois */}
+                    <div style={{ height: 6, background: '#1E1E2E', borderRadius: 99, overflow: 'hidden', marginTop: 10 }}>
+                      <div style={{ height: '100%', width: `${progressMois}%`, borderRadius: 99, background: 'linear-gradient(90deg,#22D3A5,#6C63FF)', transition: 'width 0.8s' }} />
+                    </div>
+                    <div style={{ fontSize: 10, color: '#22D3A5', fontWeight: 600, marginTop: 4 }}>{progressMois.toFixed(0)}%</div>
+                  </div>
+                </div>
+
+                {/* Note indicative pour la semaine */}
+                <div style={{ fontSize: 11, color: '#4A4A6A', fontStyle: 'italic', textAlign: 'center' }}>
+                  * Les chiffres de la semaine sont indicatifs — ils peuvent varier selon le timing des achats de stock
+                </div>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: '#4A4A6A', fontSize: 13 }}>
+                Définis un objectif net pour voir le détail semaine + mois
               </div>
-              <div style={{ background: '#0A0A0F', borderRadius: 12, padding: '12px 14px' }}>
-                <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 6 }}>Reste à faire</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: objAtteint ? '#22D3A5' : '#F59E0B', fontFamily: 'JetBrains Mono, monospace' }}>{objAtteint ? '✓ Atteint' : objectif > 0 ? eur(resteObj) : '—'}</div>
-              </div>
-            </div>
-            {objectif > 0 && <>
-              <div style={{ height: 10, background: '#1E1E2E', borderRadius: 99, overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{ height: '100%', width: `${progressObj}%`, borderRadius: 99, background: objAtteint ? 'linear-gradient(90deg,#22D3A5,#6C63FF)' : 'linear-gradient(90deg,#6C63FF,#9C8FFF)', transition: 'width 0.8s ease' }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: '#6C63FF', fontWeight: 600 }}>{progressObj.toFixed(1)}% accompli</span>
-                <span style={{ color: '#8888AA' }}>Objectif : {eur(objectif)}</span>
-              </div>
-            </>}
+            )}
           </Card>
 
           {/* Progression mois */}
