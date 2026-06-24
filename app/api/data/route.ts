@@ -143,6 +143,19 @@ export async function GET() {
       .reduce((s, r) => s + r.montantTVA, 0)
     const tvaAReverser = tvaCollecteeMois - tvaDeductibleMois
 
+    // ── Charges fixes + variables (via Montant_hebdo — déjà lissé selon périodicité) ──
+    // Hebdo = somme directe des Montant_hebdo
+    // Mois = hebdo × 4,33
+    const chargesFixesHebdo = depenses
+      .filter(r => r.categorie === 'Charge fixe')
+      .reduce((s, r) => s + r.montantHebdo, 0)
+    const chargesVariablesHebdo = depenses
+      .filter(r => r.categorie === 'Charge variable')
+      .reduce((s, r) => s + r.montantHebdo, 0)
+    const chargesHebdo = chargesFixesHebdo + chargesVariablesHebdo
+    const chargesMois = chargesHebdo * 4.33
+
+    // Garder les totaux bruts pour les affichages historiques
     const chargesFixesTotales = depenses.filter(r => r.categorie === 'Charge fixe').reduce((s, r) => s + r.montantHT, 0)
     const chargesVariablesTotales = depenses.filter(r => r.categorie === 'Charge variable').reduce((s, r) => s + r.montantHT, 0)
 
@@ -208,9 +221,7 @@ export async function GET() {
     // Marge brute = CA - achats fournisseurs (les coûts variables liés au volume de vente)
     // Taux de marge sur CV = Marge brute / CA
     // Seuil = Charges fixes du mois / Taux de marge sur CV
-    const chargesFixesMoisCourant = depenses
-      .filter(r => r.categorie === 'Charge fixe' && r.date && monthKey(r.date) === currentMonth)
-      .reduce((s, r) => s + r.montantHT, 0)
+    const chargesFixesMoisCourant = chargesFixesHebdo * 4.33
     const margeBruteMois = revenusMoisCourant - achatsFournisseursMois
     const tauxMargeVariable = revenusMoisCourant > 0 ? (margeBruteMois / revenusMoisCourant) * 100 : 0
     // seuilRentabilite reste calculable tant que le taux de marge est strictement positif.
@@ -252,6 +263,7 @@ export async function GET() {
       totalRevenus, totalDepenses, revenusMoisCourant, revenusMoisDernier, depensesMoisCourant, depensesMoisCourantTTC,
       revenusSemaine, depensesSemaine, depensesSemaineTTC,
       chargesFixesTotales, chargesVariablesTotales, chargesFixesMoisCourant,
+      chargesFixesHebdo, chargesVariablesHebdo, chargesHebdo, chargesMois,
       beneficeParMois, venteParCat, venteParCatMoisCourant, depParCat, depParCatMoisCourant, margeParCat,
       evolutionJournaliere, progressionMois,
       seuilRentabilite, tauxMargeVariable, coutMatierePC, margeNegative, margeBruteMois,
