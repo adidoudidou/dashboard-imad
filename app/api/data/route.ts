@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { getSheetsClient, SPREADSHEET_ID } from '@/lib/sheets'
 
 export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
 function parseNum(s: string | undefined): number {
   if (!s) return 0
@@ -25,8 +24,9 @@ function monthLabel(key: string) {
   return new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleString('fr-FR', { month: 'long', year: 'numeric' })
 }
 
+// Returns Monday 00:00 and Sunday 23:59:59 of the week containing `d`
 function weekBounds(d: Date): { start: Date; end: Date } {
-  const day = d.getDay()
+  const day = d.getDay() // 0 = Sunday, 1 = Monday...
   const diffToMonday = day === 0 ? -6 : 1 - day
   const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diffToMonday)
   start.setHours(0, 0, 0, 0)
@@ -37,7 +37,6 @@ function weekBounds(d: Date): { start: Date; end: Date } {
 }
 
 const VENTE_CATEGORIES = ['Boissons', 'Boucherie', 'Charcuterie', 'Épicerie', 'Fruits & Légumes', 'Rôtisserie']
-const MARCHANDISES_CATS = ['Boisson', 'Boucherie', 'Charcuterie', 'Epicerie', 'Fruit et légume', 'Rotisserie']
 const CAT_MAP: Record<string, string> = {
   'Boissons': 'Boisson',
   'Boucherie': 'Boucherie',
@@ -52,20 +51,14 @@ export async function GET() {
     const sheets = getSheetsClient()
 
     const [ventesRes, depensesRes] = await Promise.all([
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: 'Ventes!A:S',
-      }),
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: 'Dépenses!A:R',
-      }),
+      sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'Ventes!A:S' }),
+      sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'Dépenses!A:R' }),
     ])
 
     const ventesRows = ventesRes.data.values || []
     const depensesRows = depensesRes.data.values || []
 
-    // ── Parse Ventes ─────────────────────────────────────────────────────────
+    // ── Parse Ventes (only rows with Numéro Z) ───────────────────────────────
     const [, ...vData] = ventesRows
     type VenteRow = {
       date: Date; dateStr: string; caHT: number; tvaMontant: number
@@ -90,82 +83,69 @@ export async function GET() {
       .filter(r => r.date !== null)
 
     // ── Parse Dépenses ────────────────────────────────────────────────────────
-    // Colonnes : A=0 Date facturation, B=1 Fournisseur, C=2 N°Facture,
-    // D=3 MontantHT, E=4 TVA Taux, F=5 TVA Montant, G=6 Montant TTC,
+    // Columns: A=0 Date, B=1 Fournisseur, C=2 N°Facture, D=3 MontantHT,
+    // E=4 TVA Taux, F=5 TVA Montant, G=6 Montant TTC,
     // H=7 Catégorie, L=11 Échéance, M=12 Période, N=13 Montant_hebdo,
     // O=14 Date échéance finale, P=15 Statut_paiement, Q=16 ID
     const [, ...dData] = depensesRows
     type DepRow = {
-      dateFacturation: Date | null
-      dateEcheanceFin: Date | null   // ← référence pour classer dans un mois/semaine
-      fournisseur: string
-      montantHT: number; montantTVA: number; montantTTC: number
-      categorie: string; statut: string
-      periode: string; montantHebdo: number
+      date: Date | null; fournisseur: string; montantHT: number; montantTVA: number; montantTTC: number
+      categorie: string; statut: string; echeance: Date | null
+      periode: string; montantHebdo: number; dateEcheanceFin: Date | null
       id: string
     }
 
-    const depenses: DepRow[] = dData
-      .filter(r => r[1] && r[1].trim() !== '') // ignorer lignes vides
-      .map(r => ({
-        dateFacturation: parseDate(r[0]),
-        dateEcheanceFin: parseDate(r[14]),
-        fournisseur: r[1] || '',
-        montantHT: parseNum(r[3]),
-        montantTVA: parseNum(r[5]),
-        montantTTC: parseNum(r[6]),
-        categorie: (r[7] || '').trim(),
-        statut: (r[15] || '').trim(),
-        periode: r[12] || '',
-        montantHebdo: parseNum(r[13]),
-        id: r[16] ? String(r[16]).trim() : '',
-      }))
+    const depenses: DepRow[] = dData.map(r => ({
+      date: parseDate(r[0]),
+      fournisseur: r[1] || '',
+      montantHT: parseNum(r[3]),
+      montantTVA: parseNum(r[5]),
+      montantTTC: parseNum(r[6]),
+      categorie: r[7] || '',
+      statut: r[15] || '',
+      echeance: parseDate(r[11]),
+      periode: r[12] || '',
+      montantHebdo: parseNum(r[13]),
+      dateEcheanceFin: parseDate(r[14]),
+      id: r[16] ? String(r[16]).trim() : '',
+    }))
 
     const today = new Date()
     const currentMonth = monthKey(today)
     const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1)
     const lastMonth = monthKey(lastMonthDate)
-    const { start: weekStart, end: weekEnd } = weekBounds(today)
 
-    // Helpers : est-ce que la dépense appartient à ce mois/semaine (via date échéance)
-    const inMonth = (r: DepRow, key: string) => {
-      const d = r.dateEcheanceFin || r.dateFacturation
-      return d ? monthKey(d) === key : false
-    }
-    const inWeek = (r: DepRow) => {
-      const d = r.dateEcheanceFin || r.dateFacturation
-      return d ? d >= weekStart && d <= weekEnd : false
-    }
-
-    // ── Revenus ───────────────────────────────────────────────────────────────
+    const totalRevenus = ventes.reduce((s, r) => s + r.caHT, 0)
     const revenusMoisCourant = ventes.filter(r => monthKey(r.date) === currentMonth).reduce((s, r) => s + r.caHT, 0)
     const revenusMoisDernier = ventes.filter(r => monthKey(r.date) === lastMonth).reduce((s, r) => s + r.caHT, 0)
-    const revenusSemaine = ventes.filter(r => r.date >= weekStart && r.date <= weekEnd).reduce((s, r) => s + r.caHT, 0)
+    const totalDepenses = depenses.reduce((s, r) => s + r.montantHT, 0)
+    const depensesMoisCourant = depenses.filter(r => r.date && monthKey(r.date) === currentMonth).reduce((s, r) => s + r.montantHT, 0)
+    const depensesMoisCourantTTC = depenses.filter(r => r.date && monthKey(r.date) === currentMonth).reduce((s, r) => s + r.montantTTC, 0)
 
-    // TVA collectée mois courant
-    const tvaCollecteeMois = ventes.filter(r => monthKey(r.date) === currentMonth).reduce((s, r) => s + r.tvaMontant, 0)
+    // ── Semaine en cours (lundi → dimanche) ─────────────────────────────────
+    const { start: weekStart, end: weekEnd } = weekBounds(today)
+    const revenusSemaine = ventes
+      .filter(r => r.date >= weekStart && r.date <= weekEnd)
+      .reduce((s, r) => s + r.caHT, 0)
+    const depensesSemaine = depenses
+      .filter(r => r.date && r.date >= weekStart && r.date <= weekEnd)
+      .reduce((s, r) => s + r.montantHT, 0)
+    const depensesSemaineTTC = depenses
+      .filter(r => r.date && r.date >= weekStart && r.date <= weekEnd)
+      .reduce((s, r) => s + r.montantTTC, 0)
 
-    // ── Dépenses mois courant (via date échéance) ─────────────────────────────
-    const depMoisCourant = depenses.filter(r => inMonth(r, currentMonth))
-    const depensesMoisCourant = depMoisCourant.reduce((s, r) => s + r.montantHT, 0)
-    const depensesMoisCourantTTC = depMoisCourant.reduce((s, r) => s + r.montantTTC, 0)
-    const tvaDeductibleMois = depMoisCourant.reduce((s, r) => s + r.montantTVA, 0)
+    // ── TVA à reverser (mois courant) ────────────────────────────────────────
+    const tvaCollecteeMois = ventes
+      .filter(r => monthKey(r.date) === currentMonth)
+      .reduce((s, r) => s + r.tvaMontant, 0)
+    const tvaDeductibleMois = depenses
+      .filter(r => r.date && monthKey(r.date) === currentMonth)
+      .reduce((s, r) => s + r.montantTVA, 0)
     const tvaAReverser = tvaCollecteeMois - tvaDeductibleMois
 
-    // ── Dépenses semaine (via date échéance) ──────────────────────────────────
-    const depSemaine = depenses.filter(r => inWeek(r))
-    const depensesSemaine = depSemaine.reduce((s, r) => s + r.montantHT, 0)
-    const depensesSemaineTTC = depSemaine.reduce((s, r) => s + r.montantTTC, 0)
-
-    // ── Achats marchandises mois + semaine (pour widget objectif) ────────────
-    const achatsMarchandisesMois = depMoisCourant
-      .filter(r => MARCHANDISES_CATS.includes(r.categorie))
-      .reduce((s, r) => s + r.montantHT, 0)
-    const achatsMarchandisesHebdo = depSemaine
-      .filter(r => MARCHANDISES_CATS.includes(r.categorie))
-      .reduce((s, r) => s + r.montantHT, 0)
-
-    // ── Charges fixes + variables (via Montant_hebdo, lissé) ─────────────────
+    // ── Charges fixes + variables (via Montant_hebdo — déjà lissé selon périodicité) ──
+    // Hebdo = somme directe des Montant_hebdo
+    // Mois = hebdo × 4,33
     const chargesFixesHebdo = depenses
       .filter(r => r.categorie === 'Charge fixe')
       .reduce((s, r) => s + r.montantHebdo, 0)
@@ -174,15 +154,16 @@ export async function GET() {
       .reduce((s, r) => s + r.montantHebdo, 0)
     const chargesHebdo = chargesFixesHebdo + chargesVariablesHebdo
     const chargesMois = chargesHebdo * 4.33
-    const chargesFixesMoisCourant = chargesFixesHebdo * 4.33
+
+    // Garder les totaux bruts pour les affichages historiques
     const chargesFixesTotales = depenses.filter(r => r.categorie === 'Charge fixe').reduce((s, r) => s + r.montantHT, 0)
     const chargesVariablesTotales = depenses.filter(r => r.categorie === 'Charge variable').reduce((s, r) => s + r.montantHT, 0)
 
-    // ── Ventes par catégorie ──────────────────────────────────────────────────
     const venteParCat: Record<string, number> = {}
     VENTE_CATEGORIES.forEach(cat => {
       venteParCat[cat] = ventes.reduce((s, r) => s + ((r as any)[cat] || 0), 0)
     })
+
     const venteParCatMoisCourant: Record<string, number> = {}
     VENTE_CATEGORIES.forEach(cat => {
       venteParCatMoisCourant[cat] = ventes
@@ -190,39 +171,35 @@ export async function GET() {
         .reduce((s, r) => s + ((r as any)[cat] || 0), 0)
     })
 
-    // ── Dépenses par catégorie marchandises (mois courant, via date échéance) ─
     const depParCat: Record<string, number> = {}
-    MARCHANDISES_CATS.forEach(cat => {
+    ;['Boisson','Boucherie','Charcuterie','Epicerie','Fruit et légume','Rotisserie'].forEach(cat => {
       depParCat[cat] = depenses.filter(r => r.categorie === cat).reduce((s, r) => s + r.montantHT, 0)
     })
+
+    // Achats fournisseurs du mois en cours, par catégorie (pour coût matière + seuil rentabilité)
     const depParCatMoisCourant: Record<string, number> = {}
-    MARCHANDISES_CATS.forEach(cat => {
-      depParCatMoisCourant[cat] = depMoisCourant
-        .filter(r => r.categorie === cat)
+    ;['Boisson','Boucherie','Charcuterie','Epicerie','Fruit et légume','Rotisserie'].forEach(cat => {
+      depParCatMoisCourant[cat] = depenses
+        .filter(r => r.categorie === cat && r.date && monthKey(r.date) === currentMonth)
         .reduce((s, r) => s + r.montantHT, 0)
     })
 
-    // ── Marge par catégorie (mois courant) ────────────────────────────────────
     const margeParCat: Record<string, { ventes: number; depenses: number; marge: number; tauxMarge: number }> = {}
     VENTE_CATEGORIES.forEach(catV => {
       const catD = CAT_MAP[catV]
-      const v = venteParCatMoisCourant[catV] || 0
-      const d = depParCatMoisCourant[catD] || 0
+      const v = venteParCat[catV] || 0
+      const d = depParCat[catD] || 0
       const marge = v - d
       margeParCat[catV] = { ventes: v, depenses: d, marge, tauxMarge: v > 0 ? (marge / v) * 100 : 0 }
     })
 
-    // ── Bénéfice par mois (historique complet, via date échéance) ────────────
     const moisSet = new Set([
       ...ventes.map(r => monthKey(r.date)),
-      ...depenses.map(r => {
-        const d = r.dateEcheanceFin || r.dateFacturation
-        return d ? monthKey(d) : null
-      }).filter(Boolean) as string[],
+      ...depenses.filter(r => r.date).map(r => monthKey(r.date!)),
     ])
     const beneficeParMois = Array.from(moisSet).sort().map(key => {
       const rev = ventes.filter(r => monthKey(r.date) === key).reduce((s, r) => s + r.caHT, 0)
-      const dep = depenses.filter(r => inMonth(r, key)).reduce((s, r) => s + r.montantHT, 0)
+      const dep = depenses.filter(r => r.date && monthKey(r.date) === key).reduce((s, r) => s + r.montantHT, 0)
       return { mois: key, label: monthLabel(key), revenus: rev, depenses: dep, benefice: rev - dep }
     })
 
@@ -235,24 +212,34 @@ export async function GET() {
       ? ((revenusMoisCourant - revenusMoisDernier) / revenusMoisDernier) * 100
       : null
 
-    // ── Coût matière % (mois courant) ─────────────────────────────────────────
+    // ── Coût matière % (mois en cours) ──────────────────────────────────────
+    // = achats fournisseurs du mois / CA du mois
     const achatsFournisseursMois = Object.values(depParCatMoisCourant).reduce((s, v) => s + v, 0)
     const coutMatierePC = revenusMoisCourant > 0 ? (achatsFournisseursMois / revenusMoisCourant) * 100 : 0
 
-    // ── Seuil de rentabilité (mois courant) ───────────────────────────────────
+    // ── Seuil de rentabilité (mois en cours) ────────────────────────────────
+    // Marge brute = CA - achats fournisseurs (les coûts variables liés au volume de vente)
+    // Taux de marge sur CV = Marge brute / CA
+    // Seuil = Charges fixes du mois / Taux de marge sur CV
+    const chargesFixesMoisCourant = chargesFixesHebdo * 4.33
     const margeBruteMois = revenusMoisCourant - achatsFournisseursMois
     const tauxMargeVariable = revenusMoisCourant > 0 ? (margeBruteMois / revenusMoisCourant) * 100 : 0
+    // seuilRentabilite reste calculable tant que le taux de marge est strictement positif.
+    // S'il est négatif ou nul, le seuil de rentabilité est mathématiquement infini (ou non pertinent) :
+    // chaque euro de vente supplémentaire coûte plus cher qu'il ne rapporte avant même les charges fixes.
     const seuilRentabilite = tauxMargeVariable > 0 ? (chargesFixesMoisCourant / (tauxMargeVariable / 100)) : null
     const margeNegative = revenusMoisCourant > 0 && tauxMargeVariable <= 0
 
-    // ── Répartition dépenses (mois courant, via date échéance) ────────────────
     const repartitionDepenses: Record<string, number> = {}
-    depMoisCourant.forEach(r => {
-      if (!r.categorie) return
-      repartitionDepenses[r.categorie] = (repartitionDepenses[r.categorie] || 0) + r.montantHT
-    })
+    depenses
+      .filter(r => r.date && monthKey(r.date) === currentMonth)
+      .forEach(r => {
+        if (!r.categorie) return
+        repartitionDepenses[r.categorie] = (repartitionDepenses[r.categorie] || 0) + r.montantHT
+      })
 
-    // ── À payer ───────────────────────────────────────────────────────────────
+
+    // À payer = not paid (exclude ✅ Payé)
     const aPayerList = depenses
       .filter(r => r.statut && !r.statut.includes('Payé') && r.statut.trim() !== '')
       .sort((a, b) => {
@@ -269,38 +256,21 @@ export async function GET() {
         statut: r.statut,
         retard: r.dateEcheanceFin ? r.dateEcheanceFin < today : false,
       }))
+
     const totalAPayer = aPayerList.reduce((s, r) => s + r.montantTTC, 0)
 
     return NextResponse.json({
-      // Revenus
-      revenusMoisCourant, revenusMoisDernier, revenusSemaine,
-      // Dépenses
-      depensesMoisCourant, depensesMoisCourantTTC, depensesSemaine, depensesSemaineTTC,
-      // Achats marchandises (pour widget objectif)
-      achatsMarchandisesMois, achatsMarchandisesHebdo,
-      // Charges fixes/variables
+      totalRevenus, totalDepenses, revenusMoisCourant, revenusMoisDernier, depensesMoisCourant, depensesMoisCourantTTC,
+      revenusSemaine, depensesSemaine, depensesSemaineTTC,
       chargesFixesTotales, chargesVariablesTotales, chargesFixesMoisCourant,
       chargesFixesHebdo, chargesVariablesHebdo, chargesHebdo, chargesMois,
-      // Catégories
-      venteParCat, venteParCatMoisCourant, depParCat, depParCatMoisCourant, margeParCat,
-      // Graphiques
-      beneficeParMois, evolutionJournaliere, progressionMois,
-      // Indicateurs
+      beneficeParMois, venteParCat, venteParCatMoisCourant, depParCat, depParCatMoisCourant, margeParCat,
+      evolutionJournaliere, progressionMois,
       seuilRentabilite, tauxMargeVariable, coutMatierePC, margeNegative, margeBruteMois,
-      // TVA
+      repartitionDepenses, aPayerList, totalAPayer,
       tvaCollecteeMois, tvaDeductibleMois, tvaAReverser,
-      // Répartition
-      repartitionDepenses,
-      // À payer
-      aPayerList, totalAPayer,
-      // Labels
       currentMonth: monthLabel(currentMonth),
       lastMonth: monthLabel(lastMonth),
-    }, {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        'Pragma': 'no-cache',
-      }
     })
   } catch (error) {
     console.error('Data API error:', error)
