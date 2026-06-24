@@ -137,10 +137,10 @@ export async function GET() {
     // Achats marchandises semaine (dépenses réelles dont date échéance dans la semaine)
     const MARCHANDISES = ['Boisson','Boucherie','Charcuterie','Epicerie','Fruit et légume','Rotisserie']
     const achatsMarchandisesHebdo = depenses
-      .filter(r => MARCHANDISES.includes(r.categorie.trim()) && r.dateEcheanceFin && r.dateEcheanceFin >= weekStart && r.dateEcheanceFin <= weekEnd)
+      .filter(r => MARCHANDISES.includes(r.categorie.trim()) && r.date && r.date >= weekStart && r.date <= weekEnd)
       .reduce((s, r) => s + r.montantHT, 0)
     const achatsMarchandisesMois = depenses
-      .filter(r => MARCHANDISES.includes(r.categorie.trim()) && r.dateEcheanceFin && monthKey(r.dateEcheanceFin) === currentMonth)
+      .filter(r => MARCHANDISES.includes(r.categorie.trim()) && r.date && monthKey(r.date) === currentMonth)
       .reduce((s, r) => s + r.montantHT, 0)
 
     // ── TVA à reverser (mois courant) ────────────────────────────────────────
@@ -268,6 +268,30 @@ export async function GET() {
 
     const totalAPayer = aPayerList.reduce((s, r) => s + r.montantTTC, 0)
 
+    // ── Données annuelles (année civile en cours) ─────────────────────────────
+    const currentYear = today.getFullYear()
+    const ventesAnnee = ventes.filter(r => r.date.getFullYear() === currentYear)
+    const depensesAnnee = depenses.filter(r => r.date && r.date.getFullYear() === currentYear)
+    const caAnnee = ventesAnnee.reduce((s, r) => s + r.caHT, 0)
+    const depensesAnneeTotal = depensesAnnee.reduce((s, r) => s + r.montantHT, 0)
+    const beneficeAnnee = caAnnee - depensesAnneeTotal
+
+    const moisAnneeSet = new Set([
+      ...ventesAnnee.map(r => monthKey(r.date)),
+      ...depensesAnnee.filter(r => r.date).map(r => monthKey(r.date!)),
+    ])
+    const beneficeParMoisAnnee = Array.from(moisAnneeSet).sort().map(key => {
+      const rev = ventesAnnee.filter(r => monthKey(r.date) === key).reduce((s, r) => s + r.caHT, 0)
+      const dep = depensesAnnee.filter(r => r.date && monthKey(r.date) === key).reduce((s, r) => s + r.montantHT, 0)
+      return { mois: key, label: monthLabel(key), revenus: rev, depenses: dep, benefice: rev - dep }
+    })
+    const meilleurMois = beneficeParMoisAnnee.length > 0
+      ? beneficeParMoisAnnee.reduce((best, m) => m.benefice > best.benefice ? m : best)
+      : null
+    const pireMois = beneficeParMoisAnnee.length > 0
+      ? beneficeParMoisAnnee.reduce((worst, m) => m.benefice < worst.benefice ? m : worst)
+      : null
+
     return NextResponse.json({
       totalRevenus, totalDepenses, revenusMoisCourant, revenusMoisDernier, depensesMoisCourant, depensesMoisCourantTTC,
       revenusSemaine, depensesSemaine, depensesSemaineTTC,
@@ -279,8 +303,10 @@ export async function GET() {
       seuilRentabilite, tauxMargeVariable, coutMatierePC, margeNegative, margeBruteMois,
       repartitionDepenses, aPayerList, totalAPayer,
       tvaCollecteeMois, tvaDeductibleMois, tvaAReverser,
+      caAnnee, depensesAnneeTotal, beneficeAnnee, beneficeParMoisAnnee, meilleurMois, pireMois,
       currentMonth: monthLabel(currentMonth),
       lastMonth: monthLabel(lastMonth),
+      currentYear,
     })
   } catch (error) {
     console.error('Data API error:', error)
