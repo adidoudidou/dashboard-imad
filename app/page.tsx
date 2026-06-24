@@ -29,6 +29,7 @@ type DashData = {
   tvaCollecteeMois: number; tvaDeductibleMois: number; tvaAReverser: number
   chargesFixesTotales: number; chargesVariablesTotales: number; chargesFixesMoisCourant: number
   chargesFixesHebdo: number; chargesVariablesHebdo: number; chargesHebdo: number; chargesMois: number
+  achatsMarchandisesHebdo: number; achatsMarchandisesMois: number
   beneficeParMois: { mois: string; label: string; revenus: number; depenses: number; benefice: number }[]
   venteParCat: Record<string, number>
   venteParCatMoisCourant: Record<string, number>
@@ -138,10 +139,10 @@ export default function Dashboard() {
 
   // Objectif net : ce qu'Imad veut dans la poche
   // Marge à générer = objectif net + charges fixes/variables (qui s'appliquent au-dessus)
-  const objectifNetMois = objectif  // saisi par Imad = ce qu'il veut dans la poche
+  const objectifNetMois = objectif
   const objectifNetHebdo = objectif > 0 ? objectif / 4.33 : 0
-  const margeAGenererMois = objectifNetMois + d.chargesMois   // ce qu'il faut vendre moins les achats
-  const margeAGenererHebdo = objectifNetHebdo + d.chargesHebdo
+  const margeAGenererMois = objectifNetMois + d.chargesMois + d.achatsMarchandisesMois
+  const margeAGenererHebdo = objectifNetHebdo + d.chargesHebdo + d.achatsMarchandisesHebdo
   // Marge brute réalisée = CA - achats marchandises (hors charges fixes/var)
   const margeBruteRealisee = d.revenusMoisCourant - d.depensesMoisCourant - (d.chargesFixesMoisCourant)
   const margeBruteRealiseeHebdo = d.revenusSemaine - d.depensesSemaine - (d.chargesHebdo)
@@ -246,6 +247,7 @@ export default function Dashboard() {
                     {[
                       { label: 'Objectif net', val: eur(objectifNetHebdo), color: '#E2E2F0' },
                       { label: 'Charges fixes/var.', val: eur(d.chargesHebdo), color: '#8888AA' },
+                      { label: 'Achats marchands.', val: eur(d.achatsMarchandisesHebdo), color: '#8888AA' },
                       { label: 'Marge à générer', val: eur(margeAGenererHebdo), color: '#6C63FF', bold: true },
                       { label: 'Réalisé', val: eur(d.revenusSemaine), color: '#22D3A5' },
                       { label: 'Reste à faire', val: resteNetHebdo > 0 ? eur(resteNetHebdo) : '✓ OK', color: resteNetHebdo > 0 ? '#F59E0B' : '#22D3A5', bold: true },
@@ -268,6 +270,7 @@ export default function Dashboard() {
                     {[
                       { label: 'Objectif net', val: eur(objectifNetMois), color: '#E2E2F0' },
                       { label: 'Charges fixes/var.', val: eur(d.chargesMois), color: '#8888AA' },
+                      { label: 'Achats marchands.', val: eur(d.achatsMarchandisesMois), color: '#8888AA' },
                       { label: 'Marge à générer', val: eur(margeAGenererMois), color: '#22D3A5', bold: true },
                       { label: 'Réalisé', val: eur(d.revenusMoisCourant), color: '#22D3A5' },
                       { label: 'Reste à faire', val: resteNetMois > 0 ? eur(resteNetMois) : '✓ Atteint', color: resteNetMois > 0 ? '#F59E0B' : '#22D3A5', bold: true },
