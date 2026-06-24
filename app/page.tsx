@@ -40,6 +40,11 @@ type DashData = {
   repartitionDepenses: Record<string, number>
   aPayerList: { id: string; fournisseur: string; montantTTC: number; categorie: string; echeance: string; statut: string; retard: boolean }[]
   totalAPayer: number; currentMonth: string; lastMonth: string
+  caAnnee: number; depensesAnneeTotal: number; beneficeAnnee: number
+  beneficeParMoisAnnee: { mois: string; label: string; revenus: number; depenses: number; benefice: number }[]
+  meilleurMois: { label: string; benefice: number; revenus: number } | null
+  pireMois: { label: string; benefice: number; revenus: number } | null
+  currentYear: number
 }
 
 // ─── UI primitives ────────────────────────────────────────────────────────────
@@ -72,6 +77,7 @@ const TABS = [
   { id: 'depenses', label: '📉', title: 'Dépenses' },
   { id: 'marges', label: '📐', title: 'Marges' },
   { id: 'apayer', label: '📋', title: 'À payer' },
+  { id: 'annuel', label: '📆', title: 'Annuel' },
 ]
 
 export default function Dashboard() {
@@ -248,7 +254,7 @@ export default function Dashboard() {
                       { label: 'Objectif net', val: eur(objectifNetHebdo), color: '#E2E2F0' },
                       { label: 'Charges fixes/var.', val: eur(d.chargesHebdo), color: '#8888AA' },
                       { label: 'Achats marchands.', val: eur(d.achatsMarchandisesHebdo), color: '#8888AA' },
-                      { label: 'Marge à générer', val: eur(margeAGenererHebdo), color: '#6C63FF', bold: true },
+                      { label: 'CA à réaliser', val: eur(margeAGenererHebdo), color: '#6C63FF', bold: true },
                       { label: 'Réalisé', val: eur(d.revenusSemaine), color: '#22D3A5' },
                       { label: 'Reste à faire', val: resteNetHebdo > 0 ? eur(resteNetHebdo) : '✓ OK', color: resteNetHebdo > 0 ? '#F59E0B' : '#22D3A5', bold: true },
                     ].map(r => (
@@ -271,7 +277,7 @@ export default function Dashboard() {
                       { label: 'Objectif net', val: eur(objectifNetMois), color: '#E2E2F0' },
                       { label: 'Charges fixes/var.', val: eur(d.chargesMois), color: '#8888AA' },
                       { label: 'Achats marchands.', val: eur(d.achatsMarchandisesMois), color: '#8888AA' },
-                      { label: 'Marge à générer', val: eur(margeAGenererMois), color: '#22D3A5', bold: true },
+                      { label: 'CA à réaliser', val: eur(margeAGenererMois), color: '#22D3A5', bold: true },
                       { label: 'Réalisé', val: eur(d.revenusMoisCourant), color: '#22D3A5' },
                       { label: 'Reste à faire', val: resteNetMois > 0 ? eur(resteNetMois) : '✓ Atteint', color: resteNetMois > 0 ? '#F59E0B' : '#22D3A5', bold: true },
                     ].map(r => (
@@ -661,6 +667,83 @@ export default function Dashboard() {
               </div>
             )
           })}
+        </>}
+
+        {/* ══════════ ANNUEL ══════════ */}
+        {tab === 'annuel' && <>
+
+          {/* Bénéfice net de l'année — chiffre principal */}
+          <Card style={{ background: d.beneficeAnnee >= 0 ? '#22D3A50A' : '#F43F5E0A', border: `1px solid ${d.beneficeAnnee >= 0 ? '#22D3A533' : '#F43F5E33'}` }}>
+            <SectionTitle>✨ Bénéfice net {d.currentYear}</SectionTitle>
+            <div style={{ fontSize: 48, fontWeight: 800, color: d.beneficeAnnee >= 0 ? '#22D3A5' : '#F43F5E', fontFamily: 'JetBrains Mono, monospace', marginBottom: 8, lineHeight: 1 }}>
+              {eur(d.beneficeAnnee)}
+            </div>
+            <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 16 }}>depuis le 1er janvier {d.currentYear}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ background: '#0A0A0F', borderRadius: 10, padding: '10px 14px' }}>
+                <div style={{ fontSize: 10, color: '#8888AA', marginBottom: 4 }}>CA total</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.caAnnee)}</div>
+              </div>
+              <div style={{ background: '#0A0A0F', borderRadius: 10, padding: '10px 14px' }}>
+                <div style={{ fontSize: 10, color: '#8888AA', marginBottom: 4 }}>Dépenses totales</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.depensesAnneeTotal)}</div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Graphique CA + bénéfice mois par mois */}
+          <Card>
+            <SectionTitle>📊 CA et bénéfice mois par mois — {d.currentYear}</SectionTitle>
+            <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 16 }}>
+              Barres violettes = CA · Barres colorées = bénéfice (vert/rouge)
+            </div>
+            {d.beneficeParMoisAnnee.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={d.beneficeParMoisAnnee} margin={{ top: 4, right: 4, bottom: 0, left: -8 }} barCategoryGap="25%">
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#8888AA' }} tickLine={false} axisLine={false}
+                    tickFormatter={(v: string) => v.split(' ')[0].substring(0, 3)} />
+                  <YAxis tick={{ fontSize: 10, fill: '#8888AA' }} tickLine={false} axisLine={false}
+                    tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k€`} />
+                  <Tooltip {...TT} formatter={(v: number, name: string) => [eur(v), name === 'revenus' ? 'CA' : 'Bénéfice']} />
+                  <Bar dataKey="revenus" name="revenus" fill="#6C63FF33" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                  <Bar dataKey="benefice" name="benefice" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                    {d.beneficeParMoisAnnee.map((entry, i) => (
+                      <Cell key={i} fill={entry.benefice >= 0 ? '#22D3A5' : '#F43F5E'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4A4A6A', fontSize: 13 }}>
+                Pas encore de données pour {d.currentYear}
+              </div>
+            )}
+          </Card>
+
+          {/* Meilleur et pire mois */}
+          <div className="grid2">
+            <Card style={{ border: '1px solid #22D3A533' }}>
+              <SectionTitle>🏆 Meilleur mois</SectionTitle>
+              {d.meilleurMois ? (
+                <>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#E2E2F0', marginBottom: 8, textTransform: 'capitalize' }}>{d.meilleurMois.label}</div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>{eur(d.meilleurMois.benefice)}</div>
+                  <div style={{ fontSize: 12, color: '#8888AA' }}>CA : {eur(d.meilleurMois.revenus)}</div>
+                </>
+              ) : <div style={{ color: '#4A4A6A', fontSize: 13 }}>Pas encore de données</div>}
+            </Card>
+            <Card style={{ border: '1px solid #F43F5E33' }}>
+              <SectionTitle>📉 Pire mois</SectionTitle>
+              {d.pireMois ? (
+                <>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#E2E2F0', marginBottom: 8, textTransform: 'capitalize' }}>{d.pireMois.label}</div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>{eur(d.pireMois.benefice)}</div>
+                  <div style={{ fontSize: 12, color: '#8888AA' }}>CA : {eur(d.pireMois.revenus)}</div>
+                </>
+              ) : <div style={{ color: '#4A4A6A', fontSize: 13 }}>Pas encore de données</div>}
+            </Card>
+          </div>
+
         </>}
 
       </div>
