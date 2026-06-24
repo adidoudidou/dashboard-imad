@@ -127,12 +127,12 @@ export async function GET() {
     const lastMonth = monthKey(lastMonthDate)
     const { start: weekStart, end: weekEnd } = weekBounds(today)
 
-    // Fonction helper : est-ce que la dépense appartient à ce mois (via date échéance)
-    function inMonth(r: DepRow, key: string) {
+    // Helpers : est-ce que la dépense appartient à ce mois/semaine (via date échéance)
+    const inMonth = (r: DepRow, key: string) => {
       const d = r.dateEcheanceFin || r.dateFacturation
       return d ? monthKey(d) === key : false
     }
-    function inWeek(r: DepRow) {
+    const inWeek = (r: DepRow) => {
       const d = r.dateEcheanceFin || r.dateFacturation
       return d ? d >= weekStart && d <= weekEnd : false
     }
