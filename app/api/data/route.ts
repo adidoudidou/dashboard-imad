@@ -119,8 +119,8 @@ export async function GET() {
     const revenusMoisCourant = ventes.filter(r => monthKey(r.date) === currentMonth).reduce((s, r) => s + r.caHT, 0)
     const revenusMoisDernier = ventes.filter(r => monthKey(r.date) === lastMonth).reduce((s, r) => s + r.caHT, 0)
     const totalDepenses = depenses.reduce((s, r) => s + r.montantHT, 0)
-    const depensesMoisCourant = depenses.filter(r => r.date && monthKey(r.date) === currentMonth).reduce((s, r) => s + r.montantHT, 0)
-    const depensesMoisCourantTTC = depenses.filter(r => r.date && monthKey(r.date) === currentMonth).reduce((s, r) => s + r.montantTTC, 0)
+    const depensesMoisCourant = depenses.filter(r => r.dateEcheanceFin && monthKey(r.dateEcheanceFin) === currentMonth).reduce((s, r) => s + r.montantHT, 0)
+    const depensesMoisCourantTTC = depenses.filter(r => r.dateEcheanceFin && monthKey(r.dateEcheanceFin) === currentMonth).reduce((s, r) => s + r.montantTTC, 0)
 
     // ── Semaine en cours (lundi → dimanche) ─────────────────────────────────
     const { start: weekStart, end: weekEnd } = weekBounds(today)
@@ -128,19 +128,19 @@ export async function GET() {
       .filter(r => r.date >= weekStart && r.date <= weekEnd)
       .reduce((s, r) => s + r.caHT, 0)
     const depensesSemaine = depenses
-      .filter(r => r.date && r.date >= weekStart && r.date <= weekEnd)
+      .filter(r => r.dateEcheanceFin && r.dateEcheanceFin >= weekStart && r.dateEcheanceFin <= weekEnd)
       .reduce((s, r) => s + r.montantHT, 0)
     const depensesSemaineTTC = depenses
-      .filter(r => r.date && r.date >= weekStart && r.date <= weekEnd)
+      .filter(r => r.dateEcheanceFin && r.dateEcheanceFin >= weekStart && r.dateEcheanceFin <= weekEnd)
       .reduce((s, r) => s + r.montantTTC, 0)
 
-    // Achats marchandises semaine (dépenses réelles dont date échéance dans la semaine)
+    // Achats marchandises (date d'échéance finale, comme tout le reste)
     const MARCHANDISES = ['Boisson','Boucherie','Charcuterie','Epicerie','Fruit et légume','Rotisserie']
     const achatsMarchandisesHebdo = depenses
-      .filter(r => MARCHANDISES.includes(r.categorie.trim()) && r.date && r.date >= weekStart && r.date <= weekEnd)
+      .filter(r => MARCHANDISES.includes(r.categorie.trim()) && r.dateEcheanceFin && r.dateEcheanceFin >= weekStart && r.dateEcheanceFin <= weekEnd)
       .reduce((s, r) => s + r.montantHT, 0)
     const achatsMarchandisesMois = depenses
-      .filter(r => MARCHANDISES.includes(r.categorie.trim()) && r.date && monthKey(r.date) === currentMonth)
+      .filter(r => MARCHANDISES.includes(r.categorie.trim()) && r.dateEcheanceFin && monthKey(r.dateEcheanceFin) === currentMonth)
       .reduce((s, r) => s + r.montantHT, 0)
 
     // ── TVA à reverser (mois courant) ────────────────────────────────────────
@@ -148,25 +148,25 @@ export async function GET() {
       .filter(r => monthKey(r.date) === currentMonth)
       .reduce((s, r) => s + r.tvaMontant, 0)
     const tvaDeductibleMois = depenses
-      .filter(r => r.date && monthKey(r.date) === currentMonth)
+      .filter(r => r.dateEcheanceFin && monthKey(r.dateEcheanceFin) === currentMonth)
       .reduce((s, r) => s + r.montantTVA, 0)
     const tvaAReverser = tvaCollecteeMois - tvaDeductibleMois
 
-    // ── Charges fixes + variables — décaissement RÉEL (date de facturation, sans lissage) ──
+    // ── Charges fixes + variables — décaissement RÉEL (date d'échéance finale, sans lissage) ──
     const chargesFixesMoisCourant = depenses
-      .filter(r => r.categorie === 'Charge fixe' && r.date && monthKey(r.date) === currentMonth)
+      .filter(r => r.categorie === 'Charge fixe' && r.dateEcheanceFin && monthKey(r.dateEcheanceFin) === currentMonth)
       .reduce((s, r) => s + r.montantHT, 0)
     const chargesVariablesMoisCourant = depenses
-      .filter(r => r.categorie === 'Charge variable' && r.date && monthKey(r.date) === currentMonth)
+      .filter(r => r.categorie === 'Charge variable' && r.dateEcheanceFin && monthKey(r.dateEcheanceFin) === currentMonth)
       .reduce((s, r) => s + r.montantHT, 0)
     const chargesMois = chargesFixesMoisCourant + chargesVariablesMoisCourant
 
     // Semaine : mêmes règles, sur la fenêtre lundi-dimanche en cours
     const chargesFixesHebdo = depenses
-      .filter(r => r.categorie === 'Charge fixe' && r.date && r.date >= weekStart && r.date <= weekEnd)
+      .filter(r => r.categorie === 'Charge fixe' && r.dateEcheanceFin && r.dateEcheanceFin >= weekStart && r.dateEcheanceFin <= weekEnd)
       .reduce((s, r) => s + r.montantHT, 0)
     const chargesVariablesHebdo = depenses
-      .filter(r => r.categorie === 'Charge variable' && r.date && r.date >= weekStart && r.date <= weekEnd)
+      .filter(r => r.categorie === 'Charge variable' && r.dateEcheanceFin && r.dateEcheanceFin >= weekStart && r.dateEcheanceFin <= weekEnd)
       .reduce((s, r) => s + r.montantHT, 0)
     const chargesHebdo = chargesFixesHebdo + chargesVariablesHebdo
 
@@ -195,7 +195,7 @@ export async function GET() {
     const depParCatMoisCourant: Record<string, number> = {}
     ;['Boisson','Boucherie','Charcuterie','Epicerie','Fruit et légume','Rotisserie'].forEach(cat => {
       depParCatMoisCourant[cat] = depenses
-        .filter(r => r.categorie === cat && r.date && monthKey(r.date) === currentMonth)
+        .filter(r => r.categorie === cat && r.dateEcheanceFin && monthKey(r.dateEcheanceFin) === currentMonth)
         .reduce((s, r) => s + r.montantHT, 0)
     })
 
@@ -210,11 +210,11 @@ export async function GET() {
 
     const moisSet = new Set([
       ...ventes.map(r => monthKey(r.date)),
-      ...depenses.filter(r => r.date).map(r => monthKey(r.date!)),
+      ...depenses.filter(r => r.dateEcheanceFin).map(r => monthKey(r.dateEcheanceFin!)),
     ])
     const beneficeParMois = Array.from(moisSet).sort().map(key => {
       const rev = ventes.filter(r => monthKey(r.date) === key).reduce((s, r) => s + r.caHT, 0)
-      const dep = depenses.filter(r => r.date && monthKey(r.date) === key).reduce((s, r) => s + r.montantHT, 0)
+      const dep = depenses.filter(r => r.dateEcheanceFin && monthKey(r.dateEcheanceFin) === key).reduce((s, r) => s + r.montantHT, 0)
       return { mois: key, label: monthLabel(key), revenus: rev, depenses: dep, benefice: rev - dep }
     })
 
@@ -246,7 +246,7 @@ export async function GET() {
 
     const repartitionDepenses: Record<string, number> = {}
     depenses
-      .filter(r => r.date && monthKey(r.date) === currentMonth)
+      .filter(r => r.dateEcheanceFin && monthKey(r.dateEcheanceFin) === currentMonth)
       .forEach(r => {
         if (!r.categorie) return
         repartitionDepenses[r.categorie] = (repartitionDepenses[r.categorie] || 0) + r.montantHT
@@ -282,7 +282,7 @@ export async function GET() {
     // ── Données annuelles (année civile en cours, jusqu'au mois courant inclus) ──
     const currentYear = today.getFullYear()
     const ventesAnnee = ventes.filter(r => r.date.getFullYear() === currentYear && monthKey(r.date) <= currentMonth)
-    const depensesAnnee = depenses.filter(r => r.date && r.date.getFullYear() === currentYear && monthKey(r.date) <= currentMonth)
+    const depensesAnnee = depenses.filter(r => r.dateEcheanceFin && r.dateEcheanceFin.getFullYear() === currentYear && monthKey(r.dateEcheanceFin) <= currentMonth)
     const caAnnee = ventesAnnee.reduce((s, r) => s + r.caHT, 0)
     const depensesAnneeTotal = depensesAnnee.reduce((s, r) => s + r.montantHT, 0)
     const beneficeAnnee = caAnnee - depensesAnneeTotal
@@ -294,7 +294,7 @@ export async function GET() {
     }
     const beneficeParMoisAnnee = moisAnneeList.map(key => {
       const rev = ventesAnnee.filter(r => monthKey(r.date) === key).reduce((s, r) => s + r.caHT, 0)
-      const dep = depensesAnnee.filter(r => r.date && monthKey(r.date) === key).reduce((s, r) => s + r.montantHT, 0)
+      const dep = depensesAnnee.filter(r => r.dateEcheanceFin && monthKey(r.dateEcheanceFin) === key).reduce((s, r) => s + r.montantHT, 0)
       return { mois: key, label: monthLabel(key), revenus: rev, depenses: dep, benefice: rev - dep }
     })
     const moisAvecActivite = beneficeParMoisAnnee.filter(m => m.revenus > 0 || m.depenses > 0)
