@@ -152,8 +152,7 @@ export async function GET() {
       .reduce((s, r) => s + r.montantTVA, 0)
     const tvaAReverser = tvaCollecteeMois - tvaDeductibleMois
 
-    // ── Charges fixes + variables — décaissement RÉEL du mois (date facturation) ──
-    // Plus de lissage : on prend le montant brut des factures datées de ce mois.
+    // ── Charges fixes + variables — décaissement RÉEL (date de facturation, sans lissage) ──
     const chargesFixesMoisCourant = depenses
       .filter(r => r.categorie === 'Charge fixe' && r.date && monthKey(r.date) === currentMonth)
       .reduce((s, r) => s + r.montantHT, 0)
@@ -162,14 +161,13 @@ export async function GET() {
       .reduce((s, r) => s + r.montantHT, 0)
     const chargesMois = chargesFixesMoisCourant + chargesVariablesMoisCourant
 
-    // Hebdo (lissé via Montant_hebdo) — utilisé UNIQUEMENT pour le widget Objectif vue semaine,
-    // car une fenêtre de 7 jours est trop courte pour refléter le vrai décaissement.
+    // Semaine : mêmes règles, sur la fenêtre lundi-dimanche en cours
     const chargesFixesHebdo = depenses
-      .filter(r => r.categorie === 'Charge fixe')
-      .reduce((s, r) => s + r.montantHebdo, 0)
+      .filter(r => r.categorie === 'Charge fixe' && r.date && r.date >= weekStart && r.date <= weekEnd)
+      .reduce((s, r) => s + r.montantHT, 0)
     const chargesVariablesHebdo = depenses
-      .filter(r => r.categorie === 'Charge variable')
-      .reduce((s, r) => s + r.montantHebdo, 0)
+      .filter(r => r.categorie === 'Charge variable' && r.date && r.date >= weekStart && r.date <= weekEnd)
+      .reduce((s, r) => s + r.montantHT, 0)
     const chargesHebdo = chargesFixesHebdo + chargesVariablesHebdo
 
     // Garder les totaux bruts pour les affichages historiques
@@ -255,9 +253,15 @@ export async function GET() {
       })
 
 
-    // À payer = not paid (exclude ✅ Payé)
+    // À payer = not paid (exclude ✅ Payé), limité aux échéances dans les 30 prochains jours
+    // (les charges plus lointaines, ex: loyer de décembre déjà pré-rentré, restent dans les calculs
+    // mais n'encombrent pas le tableau de rappel tant qu'elles ne sont pas proches)
+    const horizon30j = new Date(today)
+    horizon30j.setDate(horizon30j.getDate() + 30)
+
     const aPayerList = depenses
       .filter(r => r.statut && !r.statut.includes('Payé') && r.statut.trim() !== '')
+      .filter(r => !r.dateEcheanceFin || r.dateEcheanceFin <= horizon30j) // garde aussi les sans-date et les en retard
       .sort((a, b) => {
         if (!a.dateEcheanceFin) return 1
         if (!b.dateEcheanceFin) return -1
