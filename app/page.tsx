@@ -27,7 +27,7 @@ type DashData = {
   revenusMoisCourant: number; revenusMoisDernier: number; depensesMoisCourant: number; depensesMoisCourantTTC: number
   revenusSemaine: number; depensesSemaine: number; depensesSemaineTTC: number
   tvaCollecteeMois: number; tvaDeductibleMois: number; tvaAReverser: number
-  chargesFixesTotales: number; chargesVariablesTotales: number; chargesFixesMoisCourant: number
+  chargesFixesTotales: number; chargesVariablesTotales: number; chargesFixesMoisCourant: number; chargesVariablesMoisCourant: number
   chargesFixesHebdo: number; chargesVariablesHebdo: number; chargesHebdo: number; chargesMois: number
   achatsMarchandisesHebdo: number; achatsMarchandisesMois: number
   beneficeParMois: { mois: string; label: string; revenus: number; depenses: number; benefice: number }[]
