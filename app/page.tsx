@@ -184,6 +184,7 @@ export default function Dashboard() {
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; }
     .grid2 > * { min-width: 0; }
     @media(min-width:600px) { .grid2 { gap: 16px; } }
+    @media(min-width:520px) { .objectif-grid { grid-template-columns: 1fr 1fr !important; } }
   `
 
   const activeTab = TABS.find(t => t.id === tab)!
@@ -247,7 +248,7 @@ export default function Dashboard() {
             {objectif > 0 ? (
               <>
                 {/* Tableau semaine + mois */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                <div className="objectif-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginBottom: 20 }}>
                   {/* Semaine */}
                   <div style={{ background: '#0A0A0F', borderRadius: 12, padding: '14px' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: '#6C63FF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Cette semaine</div>
