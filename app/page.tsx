@@ -56,13 +56,13 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 function KpiCard({ label, value, sub, color, icon }: { label: string; value: string; sub?: string; color: string; icon: string }) {
   return (
-    <Card style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <Card style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: '#8888AA', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
-        <span style={{ fontSize: 20 }}>{icon}</span>
+        <span style={{ fontSize: 20, flexShrink: 0 }}>{icon}</span>
       </div>
-      <div style={{ fontSize: 26, fontWeight: 800, color, fontFamily: 'JetBrains Mono, monospace', lineHeight: 1.1, wordBreak: 'break-all' }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: '#8888AA' }}>{sub}</div>}
+      <div style={{ fontSize: 'clamp(15px, 5.5vw, 24px)', fontWeight: 800, color, fontFamily: 'JetBrains Mono, monospace', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: '#8888AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>}
     </Card>
   )
 }
@@ -181,7 +181,8 @@ export default function Dashboard() {
     .tab-emoji { font-size: 20px; }
     .tab-label { font-size: 9px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
     input:focus { outline: none; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; }
+    .grid2 > * { min-width: 0; }
     @media(min-width:600px) { .grid2 { gap: 16px; } }
   `
 
@@ -312,7 +313,7 @@ export default function Dashboard() {
             <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 14 }}>{d.lastMonth} → {d.currentMonth}</div>
             {d.progressionMois !== null ? (
               <>
-                <div style={{ fontSize: 42, fontWeight: 800, color: d.progressionMois >= 0 ? '#22D3A5' : '#F43F5E', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>
+                <div style={{ fontSize: 'clamp(28px, 9vw, 42px)', fontWeight: 800, color: d.progressionMois >= 0 ? '#22D3A5' : '#F43F5E', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>
                   {pct(d.progressionMois)}
                 </div>
                 <div style={{ fontSize: 13, color: d.progressionMois >= 0 ? '#22D3A5' : '#F43F5E', marginBottom: 20 }}>{d.progressionMois >= 0 ? '▲ En hausse' : '▼ En baisse'}</div>
@@ -336,7 +337,7 @@ export default function Dashboard() {
           <Card>
             <SectionTitle>🧾 TVA à reverser — {d.currentMonth}</SectionTitle>
             <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 16 }}>TVA collectée moins TVA déductible</div>
-            <div style={{ fontSize: 36, fontWeight: 800, color: d.tvaAReverser >= 0 ? '#F59E0B' : '#22D3A5', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>
+            <div style={{ fontSize: 'clamp(24px, 7vw, 36px)', fontWeight: 800, color: d.tvaAReverser >= 0 ? '#F59E0B' : '#22D3A5', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>
               {eur(d.tvaAReverser)}
             </div>
             <div style={{ fontSize: 13, color: '#8888AA', marginBottom: 20 }}>
@@ -362,17 +363,17 @@ export default function Dashboard() {
               <SectionTitle>💰 Revenus (HT)</SectionTitle>
               <div style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 4 }}>Cette semaine</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.revenusSemaine)}</div>
+                <div style={{ fontSize: 'clamp(16px, 5vw, 22px)', fontWeight: 700, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.revenusSemaine)}</div>
               </div>
               <div style={{ borderTop: '1px solid #1E1E2E', paddingTop: 14 }}>
                 <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 4 }}>{d.currentMonth}</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.revenusMoisCourant)}</div>
+                <div style={{ fontSize: 'clamp(16px, 5vw, 22px)', fontWeight: 700, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.revenusMoisCourant)}</div>
               </div>
             </Card>
             <Card>
               <SectionTitle>🧾 TVA collectée</SectionTitle>
               <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 14 }}>{d.currentMonth}</div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: '#6C63FF', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.tvaCollecteeMois)}</div>
+              <div style={{ fontSize: 'clamp(19px, 6vw, 28px)', fontWeight: 800, color: '#6C63FF', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.tvaCollecteeMois)}</div>
               <div style={{ fontSize: 12, color: '#8888AA', marginTop: 10, lineHeight: 1.4 }}>collectée sur les ventes, à reverser (déduction faite de la TVA sur achats)</div>
             </Card>
           </div>
@@ -458,17 +459,17 @@ export default function Dashboard() {
               <SectionTitle>📉 Dépenses (HT)</SectionTitle>
               <div style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 4 }}>Cette semaine</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.depensesSemaine)}</div>
+                <div style={{ fontSize: 'clamp(16px, 5vw, 22px)', fontWeight: 700, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.depensesSemaine)}</div>
               </div>
               <div style={{ borderTop: '1px solid #1E1E2E', paddingTop: 14 }}>
                 <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 4 }}>{d.currentMonth}</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.depensesMoisCourant)}</div>
+                <div style={{ fontSize: 'clamp(16px, 5vw, 22px)', fontWeight: 700, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.depensesMoisCourant)}</div>
               </div>
             </Card>
             <Card>
               <SectionTitle>🧾 TVA déductible</SectionTitle>
               <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 14 }}>{d.currentMonth}</div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: '#6C63FF', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.tvaDeductibleMois)}</div>
+              <div style={{ fontSize: 'clamp(19px, 6vw, 28px)', fontWeight: 800, color: '#6C63FF', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.tvaDeductibleMois)}</div>
               <div style={{ borderTop: '1px solid #1E1E2E', marginTop: 14, paddingTop: 14 }}>
                 <div style={{ fontSize: 11, color: '#8888AA', marginBottom: 4 }}>Total réel à sortir (HT + TVA)</div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#F59E0B', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.depensesMoisCourantTTC)}</div>
@@ -508,7 +509,7 @@ export default function Dashboard() {
           <Card>
             <SectionTitle>🧮 Coût matière % — {d.currentMonth}</SectionTitle>
             <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 16 }}>Part des achats fournisseurs dans le CA du mois</div>
-            <div style={{ fontSize: 52, fontWeight: 800, color: d.coutMatierePC > 40 ? '#F43F5E' : d.coutMatierePC > 30 ? '#F59E0B' : '#22D3A5', fontFamily: 'JetBrains Mono, monospace', marginBottom: 8 }}>
+            <div style={{ fontSize: 'clamp(32px, 10vw, 52px)', fontWeight: 800, color: d.coutMatierePC > 40 ? '#F43F5E' : d.coutMatierePC > 30 ? '#F59E0B' : '#22D3A5', fontFamily: 'JetBrains Mono, monospace', marginBottom: 8 }}>
               {d.coutMatierePC.toFixed(1)}%
             </div>
             <div style={{ fontSize: 13, color: d.coutMatierePC > 40 ? '#F43F5E' : d.coutMatierePC > 30 ? '#F59E0B' : '#22D3A5', marginBottom: 20, fontWeight: 600 }}>
@@ -530,7 +531,7 @@ export default function Dashboard() {
             <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 16 }}>CA minimum du mois pour couvrir toutes les charges</div>
             {d.seuilRentabilite !== null ? (
               <>
-                <div style={{ fontSize: 36, fontWeight: 800, color: '#F59E0B', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>{eur(d.seuilRentabilite)}</div>
+                <div style={{ fontSize: 'clamp(24px, 7vw, 36px)', fontWeight: 800, color: '#F59E0B', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>{eur(d.seuilRentabilite)}</div>
                 <div style={{ fontSize: 13, color: '#8888AA', marginBottom: 20 }}>à réaliser pour être à l'équilibre</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {[
@@ -675,18 +676,18 @@ export default function Dashboard() {
           {/* Bénéfice net de l'année — chiffre principal */}
           <Card style={{ background: d.beneficeAnnee >= 0 ? '#22D3A50A' : '#F43F5E0A', border: `1px solid ${d.beneficeAnnee >= 0 ? '#22D3A533' : '#F43F5E33'}` }}>
             <SectionTitle>✨ Bénéfice net {d.currentYear}</SectionTitle>
-            <div style={{ fontSize: 48, fontWeight: 800, color: d.beneficeAnnee >= 0 ? '#22D3A5' : '#F43F5E', fontFamily: 'JetBrains Mono, monospace', marginBottom: 8, lineHeight: 1 }}>
+            <div style={{ fontSize: 'clamp(30px, 9vw, 48px)', fontWeight: 800, color: d.beneficeAnnee >= 0 ? '#22D3A5' : '#F43F5E', fontFamily: 'JetBrains Mono, monospace', marginBottom: 8, lineHeight: 1 }}>
               {eur(d.beneficeAnnee)}
             </div>
             <div style={{ fontSize: 12, color: '#8888AA', marginBottom: 16 }}>depuis le 1er janvier {d.currentYear}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div style={{ background: '#0A0A0F', borderRadius: 10, padding: '10px 14px' }}>
                 <div style={{ fontSize: 10, color: '#8888AA', marginBottom: 4 }}>CA total</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.caAnnee)}</div>
+                <div style={{ fontSize: 'clamp(12px, 4vw, 16px)', fontWeight: 700, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.caAnnee)}</div>
               </div>
               <div style={{ background: '#0A0A0F', borderRadius: 10, padding: '10px 14px' }}>
                 <div style={{ fontSize: 10, color: '#8888AA', marginBottom: 4 }}>Dépenses totales</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.depensesAnneeTotal)}</div>
+                <div style={{ fontSize: 'clamp(12px, 4vw, 16px)', fontWeight: 700, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace' }}>{eur(d.depensesAnneeTotal)}</div>
               </div>
             </div>
           </Card>
@@ -727,7 +728,7 @@ export default function Dashboard() {
               {d.meilleurMois ? (
                 <>
                   <div style={{ fontSize: 18, fontWeight: 700, color: '#E2E2F0', marginBottom: 8, textTransform: 'capitalize' }}>{d.meilleurMois.label}</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>{eur(d.meilleurMois.benefice)}</div>
+                  <div style={{ fontSize: 'clamp(17px, 5.5vw, 24px)', fontWeight: 800, color: '#22D3A5', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>{eur(d.meilleurMois.benefice)}</div>
                   <div style={{ fontSize: 12, color: '#8888AA' }}>CA : {eur(d.meilleurMois.revenus)}</div>
                 </>
               ) : <div style={{ color: '#4A4A6A', fontSize: 13 }}>Pas encore de données</div>}
@@ -737,7 +738,7 @@ export default function Dashboard() {
               {d.pireMois ? (
                 <>
                   <div style={{ fontSize: 18, fontWeight: 700, color: '#E2E2F0', marginBottom: 8, textTransform: 'capitalize' }}>{d.pireMois.label}</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>{eur(d.pireMois.benefice)}</div>
+                  <div style={{ fontSize: 'clamp(17px, 5.5vw, 24px)', fontWeight: 800, color: '#F43F5E', fontFamily: 'JetBrains Mono, monospace', marginBottom: 6 }}>{eur(d.pireMois.benefice)}</div>
                   <div style={{ fontSize: 12, color: '#8888AA' }}>CA : {eur(d.pireMois.revenus)}</div>
                 </>
               ) : <div style={{ color: '#4A4A6A', fontSize: 13 }}>Pas encore de données</div>}
