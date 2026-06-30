@@ -204,8 +204,8 @@ export async function GET() {
     const margeParCat: Record<string, { ventes: number; depenses: number; marge: number; tauxMarge: number }> = {}
     VENTE_CATEGORIES.forEach(catV => {
       const catD = CAT_MAP[catV]
-      const v = venteParCat[catV] || 0
-      const d = depParCat[catD] || 0
+      const v = venteParCatMoisCourant[catV] || 0
+      const d = depParCatMoisCourant[catD] || 0
       const marge = v - d
       margeParCat[catV] = { ventes: v, depenses: d, marge, tauxMarge: v > 0 ? (marge / v) * 100 : 0 }
     })
@@ -275,28 +275,30 @@ export async function GET() {
 
     const totalAPayer = aPayerList.reduce((s, r) => s + r.montantTTC, 0)
 
-    // ── Données annuelles (année civile en cours) ─────────────────────────────
+    // ── Données annuelles (année civile en cours, jusqu'au mois courant inclus) ──
     const currentYear = today.getFullYear()
-    const ventesAnnee = ventes.filter(r => r.date.getFullYear() === currentYear)
-    const depensesAnnee = depenses.filter(r => r.date && r.date.getFullYear() === currentYear)
+    const ventesAnnee = ventes.filter(r => r.date.getFullYear() === currentYear && monthKey(r.date) <= currentMonth)
+    const depensesAnnee = depenses.filter(r => r.date && r.date.getFullYear() === currentYear && monthKey(r.date) <= currentMonth)
     const caAnnee = ventesAnnee.reduce((s, r) => s + r.caHT, 0)
     const depensesAnneeTotal = depensesAnnee.reduce((s, r) => s + r.montantHT, 0)
     const beneficeAnnee = caAnnee - depensesAnneeTotal
 
-    const moisAnneeSet = new Set([
-      ...ventesAnnee.map(r => monthKey(r.date)),
-      ...depensesAnnee.filter(r => r.date).map(r => monthKey(r.date!)),
-    ])
-    const beneficeParMoisAnnee = Array.from(moisAnneeSet).sort().map(key => {
+    // Génère la liste des mois du 1er janvier jusqu'au mois courant inclus (même sans données)
+    const moisAnneeList: string[] = []
+    for (let m = 0; m <= today.getMonth(); m++) {
+      moisAnneeList.push(`${currentYear}-${String(m + 1).padStart(2, '0')}`)
+    }
+    const beneficeParMoisAnnee = moisAnneeList.map(key => {
       const rev = ventesAnnee.filter(r => monthKey(r.date) === key).reduce((s, r) => s + r.caHT, 0)
       const dep = depensesAnnee.filter(r => r.date && monthKey(r.date) === key).reduce((s, r) => s + r.montantHT, 0)
       return { mois: key, label: monthLabel(key), revenus: rev, depenses: dep, benefice: rev - dep }
     })
-    const meilleurMois = beneficeParMoisAnnee.length > 0
-      ? beneficeParMoisAnnee.reduce((best, m) => m.benefice > best.benefice ? m : best)
+    const moisAvecActivite = beneficeParMoisAnnee.filter(m => m.revenus > 0 || m.depenses > 0)
+    const meilleurMois = moisAvecActivite.length > 0
+      ? moisAvecActivite.reduce((best, m) => m.benefice > best.benefice ? m : best)
       : null
-    const pireMois = beneficeParMoisAnnee.length > 0
-      ? beneficeParMoisAnnee.reduce((worst, m) => m.benefice < worst.benefice ? m : worst)
+    const pireMois = moisAvecActivite.length > 0
+      ? moisAvecActivite.reduce((worst, m) => m.benefice < worst.benefice ? m : worst)
       : null
 
     return NextResponse.json({
